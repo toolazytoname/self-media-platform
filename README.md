@@ -1,60 +1,200 @@
-# Self-Media Platform
+# Self-Media Platform - 自媒体内容管理平台
+
+一个基于 AI 的自媒体内容创作与多平台分发管理系统。
+
+## 📁 项目结构
 
 ```
-├── backend/           # FastAPI 后端 (Python)
+self-media-platform/
+├── backend/              # FastAPI 后端 (Python)
 │   ├── app/
-│   │   ├── api/       # API路由
-│   │   ├── core/      # 核心配置
-│   │   ├── models/    # 数据模型
-│   │   ├── platforms/ # 平台适配器
-│   │   └── services/   # 业务服务 (MiniMax API)
-│   └── requirements.txt
+│   │   ├── api/          # API 路由
+│   │   │   ├── content.py     # 内容管理
+│   │   │   ├── platforms.py  # 平台配置
+│   │   │   ├── ai_generate.py # AI 生成
+│   │   │   ├── scheduler.py  # 定时任务
+│   │   │   ├── settings.py   # 系统设置
+│   │   │   └── cms.py        # CMS 接口
+│   │   ├── core/         # 核心配置
+│   │   ├── services/     # 业务服务 (MiniMax API)
+│   │   └── platforms/    # 平台适配器
+│   ├── requirements.txt
+│   └── .env.example      # 环境变量模板
 │
-├── frontend/          # Vue3 前端
-│   └── src/
-│       ├── views/     # 页面组件
-│       │   ├── Content/   # 内容管理
-│       │   ├── Topic/     # 选题库
-│       │   ├── Material/  # 素材库
-│       │   ├── Review/    # 审核
-│       │   ├── Platform/  # 平台管理
-│       │   ├── AI/        # AI生成
-│       │   └── Stats/     # 数据统计
-│       ├── router/    # 路由配置
-│       └── App.vue    # 根组件
+├── frontend/             # Vue 3 前端
+│   ├── src/
+│   │   ├── views/       # 页面组件
+│   │   │   ├── Content/     # 内容管理
+│   │   │   ├── Platform/    # 平台管理
+│   │   │   └── Settings/    # 设置页面
+│   │   ├── router/      # 路由配置
+│   │   └── App.vue      # 根组件
+│   └── package.json
 │
-├── cms/               # CMS管理后台 (预留)
-├── docker-compose.yml # Docker部署
-├── README.md
-└── SPEC.md           # 详细规格文档
+├── docker-compose.yml   # Docker 部署配置
+├── .gitignore          # Git 忽略配置
+└── README.md
 ```
 
-## 快速开始
+## 🚀 快速开始
+
+### 前置要求
+
+- Python 3.9+
+- Node.js 18+
+- Redis (可选，用于定时任务)
+
+### 1. 克隆项目
 
 ```bash
-# 后端
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+git clone https://github.com/toolazytoname/self-media-platform.git
+cd self-media-platform
+```
 
-# 前端
+### 2. 后端启动
+
+```bash
+cd backend
+
+# 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env，填入您的 MiniMax API Key
+
+# 启动服务
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 3. 前端启动
+
+```bash
 cd frontend
+
+# 安装依赖
 npm install
+
+# 启动开发服务器
 npm run dev
 ```
 
-## 技术栈
+### 4. 访问
 
-- **后端**: FastAPI (Python 3.9+)
-- **前端**: Vue 3 + TypeScript + Vite
-- **AI**: MiniMax Max (M3/M2.7)
-- **数据库**: PostgreSQL
-- **存储**: MinIO (S3兼容)
-- **调度**: Celery + Redis
+- 前端: http://localhost:3000
+- 后端 API: http://localhost:8000
+- API 文档: http://localhost:8000/docs
 
-## 核心功能
+## ⚙️ 配置
 
-1. **内容中台**: 选题管理 / 素材库 / 内容队列 / 审核流
-2. **AI生成**: 摘要 / 播客脚本 / 文案 / 图片 / 视频
-3. **多平台分发**: 抖音 / B站 / YouTube / 小红书 / 头条 / 公众号
-4. **CMS后台**: 完整的创作者管理界面
+### 环境变量 (.env)
+
+```env
+# MiniMax API 配置
+MINIMAX_API_KEY=your_api_key_here
+MINIMAX_BASE_URL=https://api.minimaxi.com/v1
+MINIMAX_MODEL=MiniMax-M3
+```
+
+> **注意**: 请从 [MiniMax 开放平台](https://platform.minimaxi.com) 获取 API Key
+
+## 🎯 核心功能
+
+### 1. 内容管理
+- [ ] 选题管理
+- [ ] 素材库
+- [ ] 内容队列
+- [ ] 审核流程
+
+### 2. AI 智能生成
+- [x] 内容摘要
+- [x] 播客脚本生成
+- [x] 多平台文案生成
+- [x] 视频脚本生成
+- [ ] 图片生成
+- [ ] 视频生成
+
+### 3. 多平台分发
+- [x] 平台配置管理
+- [ ] 抖音
+- [ ] 小红书
+- [ ] B站
+- [ ] 今日头条
+- [ ] 微信公众号
+- [ ] YouTube
+
+### 4. 数据统计
+- [ ] 播放量统计
+- [ ] 收益分析
+- [ ] 趋势图表
+
+## 🛠️ 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| **后端** | FastAPI (Python 3.9+) |
+| **前端** | Vue 3 + TypeScript + Vite |
+| **UI 组件** | Element Plus |
+| **AI 服务** | MiniMax Max (M3/M2.7) |
+| **数据库** | PostgreSQL |
+| **对象存储** | MinIO (S3 兼容) |
+| **任务调度** | Celery + Redis |
+| **容器化** | Docker + Docker Compose |
+
+## 📦 Docker 部署
+
+```bash
+# 一键启动所有服务
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+```
+
+## 🔧 开发指南
+
+### API 接口
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| GET | `/api/config` | 获取配置 |
+| POST | `/api/config/test` | 测试 AI 连接 |
+| POST | `/api/config` | 更新配置 |
+| POST | `/api/ai/summary` | 内容摘要 |
+| POST | `/api/ai/podcast/script` | 播客脚本 |
+| POST | `/api/ai/copy` | 文案生成 |
+| POST | `/api/ai/video/script` | 视频脚本 |
+| GET | `/api/content` | 内容列表 |
+| POST | `/api/content` | 创建内容 |
+| GET | `/api/platforms` | 平台列表 |
+| POST | `/api/platforms` | 添加平台 |
+
+### 目录说明
+
+- `backend/app/api/` - API 路由定义
+- `backend/app/services/` - 业务逻辑和外部服务集成
+- `backend/app/platforms/` - 各平台 API 适配器
+- `frontend/src/views/` - Vue 页面组件
+- `frontend/src/api/` - 前端 API 调用封装
+
+## 📝 待完成功能
+
+- [ ] 用户认证系统
+- [ ] 内容编辑器和富文本支持
+- [ ] 定时自动发布
+- [ ] 平台 API 对接 (发布内容)
+- [ ] 数据统计 Dashboard
+- [ ] 团队协作功能
+- [ ] 微信小程序支持
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📄 许可证
+
+MIT License
