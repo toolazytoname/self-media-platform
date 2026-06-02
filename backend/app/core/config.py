@@ -6,6 +6,11 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 
+# backend/.env 路径 (相对当前文件: app/core/config.py -> backend/.env)
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE = BACKEND_DIR / ".env"
+
+
 class Settings(BaseSettings):
     # 应用
     APP_NAME: str = "Self-Media Platform"
@@ -32,13 +37,13 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # JWT
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = "change-me-in-production-please-use-a-long-random-string"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
     class Config:
-        # 明确指定 .env 文件路径
-        env_file = str(Path(__file__).parent.parent.parent / ".env")
+        # .env 路径: backend/.env
+        env_file = str(ENV_FILE) if ENV_FILE.exists() else None
         env_file_encoding = "utf-8"
         extra = "allow"
 

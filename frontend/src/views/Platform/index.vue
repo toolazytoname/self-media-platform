@@ -5,182 +5,197 @@
         <div class="card-header">
           <div class="card-title">
             <span>🌐</span>
-            <span>平台管理</span>
+            <span>平台账号</span>
+            <el-tag v-if="total > 0" size="small" type="info" class="count-tag">{{ total }} 个</el-tag>
           </div>
-          <el-button type="primary" @click="showDialog = true">
-            + 添加账号
-          </el-button>
+          <el-button type="primary" @click="openCreate">+ 添加账号</el-button>
         </div>
       </template>
 
-      <div v-if="accounts.length === 0" class="empty-state">
+      <div v-if="loading && accounts.length === 0" class="loading-state">加载中...</div>
+      <div v-else-if="accounts.length === 0" class="empty-state">
         <span>🌐</span>
         <p>暂无平台账号</p>
         <p class="hint">点击上方按钮添加第一个平台账号</p>
       </div>
-
       <div v-else class="account-grid">
         <div v-for="item in accounts" :key="item.id" class="account-card">
           <div class="account-icon">{{ getPlatformIcon(item.platform) }}</div>
           <div class="account-info">
             <div class="account-platform">{{ getPlatformName(item.platform) }}</div>
             <div class="account-name">{{ item.name }}</div>
+            <div v-if="item.account_id" class="account-id">ID: {{ item.account_id }}</div>
+            <div v-if="item.description" class="account-desc">{{ item.description }}</div>
             <div class="account-meta">
-              <span class="status-badge" :class="item.status">{{ item.status === 'active' ? '正常' : '异常' }}</span>
-              <span class="date">{{ formatDate(item.created_at) }}</span>
+              <span class="status-badge" :class="item.status">{{ item.status === 'active' ? '正常' : '已停用' }}</span>
+              <span class="date">{{ formatDateShort(item.created_at) }}</span>
             </div>
           </div>
-          <el-button size="small" type="danger" text @click="deleteAccount(item.id)" class="delete-btn">
-            删除
-          </el-button>
+          <div class="card-actions">
+            <el-button size="small" @click="openEdit(item)">编辑</el-button>
+            <el-button size="small" :type="item.status === 'active' ? 'warning' : 'success'"
+                       @click="toggleStatus(item)">
+              {{ item.status === 'active' ? '停用' : '启用' }}
+            </el-button>
+            <el-button size="small" type="danger" @click="onDelete(item)">删除</el-button>
+          </div>
         </div>
       </div>
     </el-card>
 
-    <el-dialog v-model="showDialog" title="添加平台账号" width="450px" class="dialog">
+    <el-dialog v-model="showDialog" :title="isEdit ? '编辑账号' : '添加平台账号'" width="500px">
       <el-form :model="form" label-position="top">
-        <el-form-item label="平台">
-          <el-select v-model="form.platform" placeholder="选择平台" style="width: 100%">
-            <el-option label="抖音" value="douyin" />
-            <el-option label="B站" value="bilibili" />
-            <el-option label="YouTube" value="youtube" />
-            <el-option label="小红书" value="xiaohongshu" />
-            <el-option label="头条号" value="toutiao" />
-            <el-option label="公众号" value="wechat" />
+        <el-form-item label="平台" required>
+          <el-select v-model="form.platform" placeholder="选择平台" style="width: 100%" :disabled="isEdit">
+            <el-option v-for="p in PLATFORM_OPTIONS" :key="p.value" :label="p.label" :value="p.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="账号名称">
-          <el-input v-model="form.name" placeholder="输入账号名称或昵称..." />
+        <el-form-item label="账号名称" required>
+          <el-input v-model="form.name" placeholder="输入账号名称或昵称..." maxlength="100" show-word-limit />
+        </el-form-item>
+        <el-form-item label="平台账号 ID">
+          <el-input v-model="form.account_id" placeholder="可选：平台上的账号 ID" />
+        </el-form-item>
+        <el-form-item label="说明">
+          <el-input v-model="form.description" type="textarea" :rows="2" placeholder="账号备注..." />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" @click="addAccount">确定</el-button>
+        <el-button type="primary" @click="onSave" :loading="saving">
+          {{ isEdit ? '保存' : '创建' }}
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import axios from 'axios'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { platformApi, type PlatformAccount } from '@/api/platforms'
+import { PLATFORM_OPTIONS, getPlatformName, getPlatformIcon, formatDateShort } from '@/constants'
 
-const accounts = ref<any[]>([])
+const accounts = ref<PlatformAccount[]>([])
+const loading = ref(false)
+const saving = ref(false)
 const showDialog = ref(false)
+const isEdit = ref(false)
+const total = computed(() => accounts.value.length)
+
 const form = ref({
+  id: '',
   platform: '',
-  name: ''
+  name: '',
+  account_id: '',
+  description: '',
 })
 
-const platformMap: Record<string, { name: string; icon: string }> = {
-  douyin: { name: '抖音', icon: '🎵' },
-  bilibili: { name: 'B站', icon: '📺' },
-  youtube: { name: 'YouTube', icon: '▶️' },
-  xiaohongshu: { name: '小红书', icon: '📕' },
-  toutiao: { name: '头条号', icon: '📰' },
-  wechat: { name: '公众号', icon: '💬' }
-}
-
-const getPlatformName = (key: string) => platformMap[key]?.name || key
-const getPlatformIcon = (key: string) => platformMap[key]?.icon || '🌐'
-
-const fetchAccounts = async () => {
+const loadList = async () => {
+  loading.value = true
   try {
-    const res = await axios.get('/api/platforms/accounts')
-    accounts.value = res.data
-  } catch (error) {
-    console.error('Failed to fetch accounts:', error)
+    accounts.value = await platformApi.listAccounts()
+  } catch (e: any) {
+    ElMessage.error('加载失败: ' + (e.normalizedMessage || e.message))
+  } finally {
+    loading.value = false
   }
 }
 
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return `${date.getMonth() + 1}/${date.getDate()}`
+const openCreate = () => {
+  isEdit.value = false
+  form.value = { id: '', platform: '', name: '', account_id: '', description: '' }
+  showDialog.value = true
 }
 
-const addAccount = async () => {
-  if (!form.value.platform || !form.value.name) {
+const openEdit = (a: PlatformAccount) => {
+  isEdit.value = true
+  form.value = {
+    id: a.id,
+    platform: a.platform,
+    name: a.name,
+    account_id: a.account_id || '',
+    description: a.description || '',
+  }
+  showDialog.value = true
+}
+
+const onSave = async () => {
+  if (!form.value.platform || !form.value.name.trim()) {
     ElMessage.warning('请填写完整信息')
     return
   }
+  saving.value = true
   try {
-    await axios.post('/api/platforms/accounts', {
-      platform: form.value.platform,
-      name: form.value.name
-    })
-    ElMessage.success('添加成功')
+    if (isEdit.value) {
+      await platformApi.updateAccount(form.value.id, {
+        name: form.value.name,
+        description: form.value.description,
+      })
+      ElMessage.success('保存成功')
+    } else {
+      await platformApi.addAccount({
+        platform: form.value.platform,
+        name: form.value.name,
+        account_id: form.value.account_id || undefined,
+        description: form.value.description,
+      })
+      ElMessage.success('添加成功')
+    }
     showDialog.value = false
-    fetchAccounts()
-  } catch (error) {
-    ElMessage.error('添加失败')
+    loadList()
+  } catch (e: any) {
+    ElMessage.error('保存失败: ' + (e.normalizedMessage || e.message))
+  } finally {
+    saving.value = false
   }
 }
 
-const deleteAccount = async (id: string) => {
+const toggleStatus = async (a: PlatformAccount) => {
+  const newStatus = a.status === 'active' ? 'inactive' : 'active'
   try {
-    await axios.delete(`/api/platforms/accounts/${id}`)
-    ElMessage.success('删除成功')
-    fetchAccounts()
-  } catch (error) {
-    ElMessage.error('删除失败')
+    await platformApi.updateAccount(a.id, { status: newStatus })
+    ElMessage.success(newStatus === 'active' ? '已启用' : '已停用')
+    loadList()
+  } catch (e: any) {
+    ElMessage.error('操作失败: ' + (e.normalizedMessage || e.message))
   }
 }
 
-onMounted(fetchAccounts)
+const onDelete = async (a: PlatformAccount) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除账号「${a.name}」吗？`,
+      '删除确认',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch { return }
+  try {
+    await platformApi.deleteAccount(a.id)
+    ElMessage.success('删除成功')
+    loadList()
+  } catch (e: any) {
+    ElMessage.error('删除失败: ' + (e.normalizedMessage || e.message))
+  }
+}
+
+onMounted(loadList)
 </script>
 
 <style scoped>
-.platform-page {
-  padding: 0;
-}
-
+.platform-page { padding: 0; }
 .platform-card {
   background: rgba(26, 26, 46, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
 }
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: #666;
-}
-
-.empty-state span {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 16px;
-}
-
-.empty-state .hint {
-  font-size: 13px;
-  color: #444;
-  margin-top: 8px;
-}
-
-.account-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
-}
-
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.card-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: #fff; }
+.count-tag { margin-left: 4px; }
+.empty-state, .loading-state { text-align: center; padding: 60px 20px; color: #666; }
+.empty-state span { font-size: 48px; display: block; margin-bottom: 16px; }
+.empty-state .hint { font-size: 13px; color: #444; margin-top: 8px; }
+.account-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .account-card {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -192,80 +207,23 @@ onMounted(fetchAccounts)
   gap: 12px;
   text-align: center;
   transition: all 0.3s ease;
-  position: relative;
 }
-
 .account-card:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(0, 212, 255, 0.2);
   transform: translateY(-2px);
 }
-
-.account-icon {
-  font-size: 40px;
-}
-
-.account-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
-
-.account-platform {
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.account-name {
-  font-size: 13px;
-  color: #aaa;
-}
-
-.account-meta {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.status-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.status-badge.active {
-  background: rgba(0, 212, 100, 0.15);
-  color: #00dc64;
-}
-
-.status-badge.inactive {
-  background: rgba(255, 71, 87, 0.15);
-  color: #ff4757;
-}
-
-.date {
-  font-size: 11px;
-  color: #666;
-}
-
-.delete-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.account-card:hover .delete-btn {
-  opacity: 1;
-}
-
-.dialog :deep(.el-dialog) {
-  background: #1a1a2e;
-  border-radius: 16px;
-}
+.account-icon { font-size: 40px; }
+.account-info { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.account-platform { font-size: 14px; font-weight: 600; color: #fff; }
+.account-name { font-size: 13px; color: #aaa; }
+.account-id { font-size: 11px; color: #666; font-family: monospace; }
+.account-desc { font-size: 12px; color: #888; line-height: 1.4; margin-top: 4px; }
+.account-meta { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 4px; }
+.status-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+.status-badge.active { background: rgba(0, 212, 100, 0.15); color: #00dc64; }
+.status-badge.inactive { background: rgba(255, 159, 67, 0.15); color: #ff9f43; }
+.date { font-size: 11px; color: #666; }
+.card-actions { display: flex; gap: 6px; width: 100%; }
+.card-actions .el-button { flex: 1; font-size: 12px; padding: 6px 4px; }
 </style>

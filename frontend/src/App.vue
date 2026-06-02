@@ -1,5 +1,8 @@
 <template>
-  <div class="app-container">
+  <!-- 登录页不使用侧边栏布局 -->
+  <router-view v-if="$route.meta?.hideLayout" />
+
+  <div v-else class="app-container">
     <el-container>
       <!-- 侧边栏 -->
       <el-aside width="220px" class="sidebar">
@@ -7,7 +10,7 @@
           <span class="logo-icon">📱</span>
           <span class="logo-text">自媒体平台</span>
         </div>
-        
+
         <el-menu
           :default-active="$route.path"
           router
@@ -32,9 +35,17 @@
             <span class="menu-icon">✅</span>
             <span>审核</span>
           </el-menu-item>
+          <el-menu-item index="/templates">
+            <span class="menu-icon">📋</span>
+            <span>内容模板</span>
+          </el-menu-item>
           <el-menu-item index="/platform">
             <span class="menu-icon">🌐</span>
             <span>平台</span>
+          </el-menu-item>
+          <el-menu-item index="/publish-records">
+            <span class="menu-icon">📤</span>
+            <span>发布记录</span>
           </el-menu-item>
           <el-menu-item index="/ai">
             <span class="menu-icon">🤖</span>
@@ -61,7 +72,27 @@
             <el-button type="primary" class="create-btn" @click="createContent">
               <span>+ 创建内容</span>
             </el-button>
-            <div class="user-avatar">👤</div>
+            <el-dropdown trigger="click" @command="onUserCmd">
+              <div class="user-avatar">
+                <span>{{ userInitial }}</span>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item disabled>
+                    <div class="user-info">
+                      <div class="user-name">{{ user?.display_name || user?.username }}</div>
+                      <div class="user-username">@{{ user?.username }}</div>
+                    </div>
+                  </el-dropdown-item>
+                  <el-dropdown-item divided command="settings">
+                    <span>⚙️ 系统设置</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="logout">
+                    <span>🚪 退出登录</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </el-header>
 
@@ -75,28 +106,60 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { clearAuth, getStoredUser, type UserInfo } from '@/api/auth'
 
 const route = useRoute()
 const router = useRouter()
 
+const user = ref<UserInfo | null>(null)
+
+const userInitial = computed(() => {
+  const u = user.value
+  if (!u) return '👤'
+  return (u.display_name || u.username).charAt(0).toUpperCase()
+})
+
 const pageTitleMap: Record<string, string> = {
   '/content': '内容管理',
+  '/content/create': '创建内容',
   '/topic': '选题库',
   '/material': '素材库',
   '/review': '审核',
+  '/templates': '内容模板',
   '/platform': '平台管理',
+  '/publish-records': '发布记录',
   '/ai': 'AI 生成',
   '/stats': '数据统计',
-  '/settings': '系统设置'
+  '/settings': '系统设置',
 }
 
-const pageTitle = computed(() => pageTitleMap[route.path] || '内容管理')
+const pageTitle = computed(() => {
+  if (route.path.startsWith('/content/edit/')) return '编辑内容'
+  if (route.path.startsWith('/content/view/')) return '内容详情'
+  return pageTitleMap[route.path] || '内容管理'
+})
 
 const createContent = () => {
   router.push('/content/create')
 }
+
+const onUserCmd = (cmd: string) => {
+  if (cmd === 'settings') {
+    router.push('/settings')
+  } else if (cmd === 'logout') {
+    clearAuth()
+    user.value = null
+    ElMessage.success('已退出登录')
+    router.push('/login')
+  }
+}
+
+onMounted(() => {
+  user.value = getStoredUser()
+})
 </script>
 
 <style>
@@ -221,6 +284,32 @@ const createContent = () => {
   align-items: center;
   justify-content: center;
   font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.user-avatar:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.user-info {
+  padding: 4px 0;
+  min-width: 160px;
+}
+
+.user-name {
+  font-size: 14px;
+  color: #fff;
+  font-weight: 600;
+}
+
+.user-username {
+  font-size: 12px;
+  color: #a0a0b0;
+  margin-top: 2px;
 }
 
 /* 主内容 */

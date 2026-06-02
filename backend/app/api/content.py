@@ -1,20 +1,20 @@
 # 内容管理 API
-
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
-from pydantic import BaseModel
-from datetime import datetime
+from pydantic import BaseModel, Field
+
+from app.store import store
 
 router = APIRouter()
 
 
-# ============ 数据模型 ============
+# ============ Pydantic 模型 ============
 
 class ContentBase(BaseModel):
-    title: str
-    body: str
+    title: str = Field(..., min_length=1, max_length=200)
+    body: str = Field(..., min_length=0)
     tags: List[str] = []
-    platform: str = "all"
+    platform: str = Field("all", description="目标平台: douyin/xiaohongshu/bilibili/toutiao/wechat/youtube/all")
 
 
 class ContentCreate(ContentBase):
@@ -22,73 +22,205 @@ class ContentCreate(ContentBase):
 
 
 class ContentUpdate(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
     body: Optional[str] = None
     tags: Optional[List[str]] = None
-    status: Optional[str] = None
+    platform: Optional[str] = None
+    status: Optional[str] = Field(None, description="draft/pending/published/failed")
 
 
 class ContentResponse(ContentBase):
     id: str
     status: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: str
+    updated_at: str
+
+
+class ContentListResponse(BaseModel):
+    total: int
+    items: List[ContentResponse]
+    skip: int
+    limit: int
+
+
+VALID_STATUSES = {"draft", "pending", "published", "failed", "archived"}
+VALID_PLATFORMS = {"douyin", "xiaohongshu", "bilibili", "toutiao", "wechat", "youtube", "all"}
 
 
 # ============ 路由 ============
 
-CONTENT_STORE = []  # 临时存储，生产环境用数据库
-
-
-@router.post("/", response_model=ContentResponse)
+@router.post("/", response_model=ContentResponse, status_code=201)
 async def create_content(content: ContentCreate):
     """创建内容"""
-    now = datetime.now()
-    item = ContentResponse(
-        id=f"content_{len(CONTENT_STORE) + 1}",
-        **content.model_dump(),
-        status="draft",
-        created_at=now,
-        updated_at=now
-    )
-    CONTENT_STORE.append(item)
+    if content.platform not in VALID_PLATFORMS:
+        raise HTTPException(status_code=400, detail=f"Invalid platform: {content.platform}")
+    item = store.add_content(content.model_dump())
     return item
 
 
-@router.get("/")
-async def list_content(skip: int = 0, limit: int = 20):
-    """列出内容"""
-    return CONTENT_STORE[skip:skip+limit]
+@router.get("/", response_model=ContentListResponse)
+async def list_content(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    status: Optional[str] = None,
+    platform: Optional[str] = None,
+    keyword: Optional[str] = None,
+):
+    """列出内容（支持筛选/分页/搜索）"""
+    if status and status not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+    if platform and platform not in VALID_PLATFORMS:
+        raise HTTPException(status_code=400, detail=f"Invalid platform: {platform}")
+
+    all_filtered = store.list_contents(skip=0, limit=10_000, status=status, platform=platform, keyword=keyword)
+    items = all_filtered[skip:skip + limit]
+    return ContentListResponse(total=len(all_filtered), items=items, skip=skip, limit=limit)
 
 
-@router.get("/{content_id}")
+@router.get("/{content_id}", response_model=ContentResponse)
 async def get_content(content_id: str):
     """获取内容详情"""
-    for item in CONTENT_STORE:
-        if item.id == content_id:
-            return item
-    raise HTTPException(status_code=404, detail="Content not found")
+    item = store.get_content(content_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Content not found")
+    return item
 
 
-@router.put("/{content_id}")
+@router.put("/{content_id}", response_model=ContentResponse)
 async def update_content(content_id: str, update: ContentUpdate):
     """更新内容"""
-    for i, item in enumerate(CONTENT_STORE):
-        if item.id == content_id:
-            update_data = update.model_dump(exclude_unset=True)
-            for k, v in update_data.items():
-                setattr(item, k, v)
-            item.updated_at = datetime.now()
-            return item
-    raise HTTPException(status_code=404, detail="Content not found")
+    if update.status and update.status not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {update.status}")
+    if update.platform and update.platform not in VALID_PLATFORMS:
+        raise HTTPException(status_code=400, detail=f"Invalid platform: {update.platform}")
+    item = store.update_content(content_id, update.model_dump(exclude_unset=True))
+    if not item:
+        raise HTTPException(status_code=404, detail="Content not found")
+    return item
 
 
 @router.delete("/{content_id}")
 async def delete_content(content_id: str):
     """删除内容"""
-    global CONTENT_STORE
-    for i, item in enumerate(CONTENT_STORE):
-        if item.id == content_id:
-            CONTENT_STORE.pop(i)
-            return {"message": "deleted"}
-    raise HTTPException(status_code=404, detail="Content not found")
+    if not store.delete_content(content_id):
+        raise HTTPException(status_code=404, detail="Content not found")
+    return {"message": "deleted", "id": content_id}
+
+
+@router.post("/{content_id}/submit-review")
+async def submit_for_review(content_id: str):
+    """提交审核（创建审核任务并将内容状态改为 pending）"""
+    content = store.get_content(content_id)
+    if not content:
+        raise HTTPException(status_code=404, detail="Content not found")
+    store.add_review({
+        "content_id": content_id,
+        "content_title": content.get("title", ""),
+        "content_body": content.get("body", ""),
+    })
+    store.update_content(content_id, {"status": "pending"})
+    return {"message": "submitted for review", "content_id": content_id}
+
+
+@router.post("/{content_id}/duplicate")
+async def duplicate_content(content_id: str):
+    """复制内容（创建草稿副本）"""
+    content = store.get_content(content_id)
+    if not content:
+        raise HTTPException(status_code=404, detail="Content not found")
+    new_item = {
+        "title": (content.get("title") or "") + " (副本)",
+        "body": content.get("body", ""),
+        "tags": list(content.get("tags") or []),
+        "platform": content.get("platform", "all"),
+    }
+    new_content = store.add_content(new_item)
+    return new_content
+
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[str] = Field(..., min_length=1, max_length=100)
+
+
+class BulkUpdateRequest(BaseModel):
+    ids: List[str] = Field(..., min_length=1, max_length=100)
+    platform: Optional[str] = None
+    status: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+@router.post("/bulk/delete")
+async def bulk_delete(req: BulkDeleteRequest):
+    """批量删除"""
+    deleted = []
+    failed = []
+    for cid in req.ids:
+        if store.delete_content(cid):
+            deleted.append(cid)
+        else:
+            failed.append(cid)
+    return {"deleted": deleted, "failed": failed, "deleted_count": len(deleted)}
+
+
+@router.post("/bulk/update")
+async def bulk_update(req: BulkUpdateRequest):
+    """批量更新"""
+    if req.status and req.status not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {req.status}")
+    if req.platform and req.platform not in VALID_PLATFORMS:
+        raise HTTPException(status_code=400, detail=f"Invalid platform: {req.platform}")
+
+    updated = []
+    failed = []
+    update_payload = {}
+    if req.platform is not None:
+        update_payload["platform"] = req.platform
+    if req.status is not None:
+        update_payload["status"] = req.status
+    if req.tags is not None:
+        update_payload["tags"] = req.tags
+
+    for cid in req.ids:
+        item = store.update_content(cid, update_payload)
+        if item:
+            updated.append(cid)
+        else:
+            failed.append(cid)
+    return {"updated": updated, "failed": failed, "updated_count": len(updated)}
+
+
+@router.get("/export/all")
+async def export_all(format: str = "json", status: Optional[str] = None, platform: Optional[str] = None):
+    """导出内容（json / markdown / csv）"""
+    items = store.list_contents(skip=0, limit=10000, status=status, platform=platform)
+    if format == "json":
+        return items
+    if format == "markdown":
+        from io import StringIO
+        buf = StringIO()
+        for c in items:
+            buf.write(f"# {c.get('title','')}\n\n")
+            buf.write(f"> 平台: {c.get('platform','')} | 状态: {c.get('status','')} | 标签: {', '.join(c.get('tags') or [])}\n\n")
+            buf.write(c.get("body", "") + "\n\n---\n\n")
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(buf.getvalue(), media_type="text/markdown")
+    if format == "csv":
+        import csv
+        from io import StringIO
+        buf = StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["id", "title", "body", "platform", "status", "tags", "created_at", "updated_at"])
+        for c in items:
+            writer.writerow([
+                c.get("id", ""),
+                c.get("title", ""),
+                c.get("body", ""),
+                c.get("platform", ""),
+                c.get("status", ""),
+                ";".join(c.get("tags") or []),
+                c.get("created_at", ""),
+                c.get("updated_at", ""),
+            ])
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(buf.getvalue(), media_type="text/csv")
+    raise HTTPException(status_code=400, detail="format must be json/markdown/csv")
