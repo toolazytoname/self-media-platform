@@ -149,11 +149,6 @@ onMounted(loadSettings)
 </script>
 
 <style scoped>
-.settings-form { max-width: 640px; }
-.form-actions {
-  display: flex; gap: 12px; flex-wrap: wrap;
-  margin-top: 8px;
-}
 .status-row {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }

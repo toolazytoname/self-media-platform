@@ -198,8 +198,8 @@
               </el-form-item>
             </el-form>
 
-            <div v-if="imageHistory.length === 0 && !loading.image" class="empty-state">
-              <div class="empty-glyph">
+            <div v-if="imageHistory.length === 0 && !loading.image" class="ds-empty">
+              <div class="glyph">
                 <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
                   <rect x="6" y="6" width="20" height="20" rx="3" />
                   <circle cx="12" cy="12" r="2" />
@@ -404,7 +404,6 @@ onMounted(async () => {
 }
 .tab-label svg { color: var(--claude-terracotta); }
 
-.ai-tab-card { max-width: 920px; margin-top: 8px; }
 .primary-cta {
   background: var(--claude-terracotta) !important;
   border: 0 !important; color: var(--claude-ivory) !important;
@@ -414,53 +413,9 @@ onMounted(async () => {
 }
 .primary-cta:hover { background: var(--claude-coral) !important; }
 
-.result-block {
-  background: var(--claude-parchment);
-  border: 1px solid var(--claude-border-warm);
-  border-radius: var(--radius-lg);
-  padding: 20px 24px;
-  margin-top: 8px;
-}
-.result-text {
-  font-family: var(--font-serif);
-  font-size: 16px; line-height: 1.75;
-  color: var(--claude-ink);
-  white-space: pre-wrap;
-}
-.result-meta {
-  font-size: 12px; color: var(--claude-stone);
-  margin-top: 12px; padding-top: 12px;
-  border-top: 1px solid var(--claude-border-cream);
-  font-variant-numeric: tabular-nums;
-}
 .generated-video { max-width: 100%; border-radius: var(--radius-lg); margin-top: 12px; }
 
-.image-gen-wrap { padding: 0; }
-.image-gen-card {
-  background: var(--claude-ivory);
-  border: 1px solid var(--claude-border-cream);
-  border-radius: 16px;
-  padding: 32px;
-  margin-bottom: 32px;
-}
-.image-gen-card .card-title {
-  font-family: var(--font-serif); font-size: 28px; font-weight: 500;
-  color: var(--claude-ink); margin: 0 0 6px;
-}
-.image-gen-card .card-lede { font-size: 14px; color: var(--claude-olive); margin: 0 0 24px; }
-.image-form :deep(.el-form-item__label) { color: var(--claude-ink); font-weight: 500; font-size: 13px; }
-.image-form :deep(.el-textarea__inner),
-.image-form :deep(.el-input__wrapper) {
-  background: var(--claude-ivory); border-radius: 12px;
-  border: 1px solid var(--claude-border-warm); box-shadow: none;
-}
-.image-form :deep(.el-textarea__inner:focus),
-.image-form :deep(.el-input__wrapper.is-focus) {
-  border-color: var(--claude-focus-blue); box-shadow: 0 0 0 3px rgba(56,152,236,0.15);
-}
-.image-form-row { display: grid; grid-template-columns: 1fr; gap: 16px; }
-.image-form-row.two-col { grid-template-columns: 1fr 1fr; }
-@media (max-width: 640px) { .image-form-row.two-col { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { }
 .gen-btn {
   background: var(--claude-terracotta) !important; border: 0 !important; color: var(--claude-ivory) !important;
   border-radius: 12px !important; padding: 10px 24px !important;
@@ -469,52 +424,4 @@ onMounted(async () => {
 .gen-btn:hover { background: var(--claude-coral) !important; }
 .cost-hint { margin-left: 14px; font-size: 12px; color: var(--claude-stone); }
 
-.empty-state { text-align: center; padding: 56px 24px 16px; color: var(--claude-stone); }
-.empty-glyph {
-  width: 56px; height: 56px; margin: 0 auto 16px;
-  border: 1.5px dashed #e8e6dc; border-radius: 14px;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--claude-stone);
-}
-.empty-state h4 { font-family: Georgia, serif; font-size: 19px; font-weight: 500; color: var(--claude-ink); margin: 0 0 6px; }
-.empty-state p { font-size: 13px; line-height: 1.6; margin: 0; max-width: 420px; margin-left: auto; margin-right: auto; }
-
-.history-section { margin-top: 8px; }
-.history-head {
-  display: flex; align-items: end; justify-content: space-between;
-  padding-bottom: 12px; border-bottom: 1px solid var(--claude-border-cream); margin-bottom: 20px;
-}
-.history-head h3 { font-family: Georgia, serif; font-size: 22px; font-weight: 500; margin: 0; color: var(--claude-ink); }
-.history-head .meta { font-size: 12px; color: var(--claude-stone); }
-.image-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-.image-tile {
-  background: var(--claude-ivory); border: 1px solid var(--claude-border-cream);
-  border-radius: 12px; overflow: hidden;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-.image-tile:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.05); }
-.image-tile .thumb {
-  position: relative; aspect-ratio: 1 / 1;
-  background: linear-gradient(135deg, #e8e6dc, #d1cfc5);
-  display: flex; align-items: center; justify-content: center; overflow: hidden;
-}
-.image-tile .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.mock-badge, .real-badge {
-  position: absolute; top: 8px; left: 8px;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
-  padding: 3px 8px; border-radius: 9999px;
-  color: #faf9f5;
-}
-.mock-badge { background: rgba(20, 20, 19, 0.78); }
-.real-badge { background: rgba(201, 100, 66, 0.92); }
-.image-tile .tile-meta { padding: 12px 14px; }
-.image-tile .prompt {
-  font-size: 13px; line-height: 1.4; color: var(--claude-ink);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; margin: 0 0 6px; min-height: 36px;
-}
-.image-tile .row {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 11px; color: var(--claude-stone); font-variant-numeric: tabular-nums;
-}
 </style>

@@ -211,44 +211,5 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.editor-form { max-width: 960px; }
-.editor-form :deep(.content-textarea .el-textarea__inner) {
-  font-family: var(--font-mono);
-  font-size: 14px; line-height: 1.7;
-  min-height: 360px;
-}
-.preview-box {
-  background: var(--claude-ivory);
-  border: 1px solid var(--claude-border-warm);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  min-height: 360px;
-  font-family: var(--font-serif);
-  font-size: 16px; line-height: 1.75;
-  color: var(--claude-ink);
-}
-.preview-box :deep(h1), .preview-box :deep(h2), .preview-box :deep(h3) {
-  font-family: var(--font-serif); font-weight: 500;
-  color: var(--claude-ink); margin: 24px 0 12px;
-}
-.preview-box :deep(p) { margin: 0 0 12px; }
-.preview-box :deep(a) { color: var(--claude-terracotta); }
-.preview-box :deep(code) {
-  font-family: var(--font-mono); font-size: 0.9em;
-  background: var(--claude-border-cream);
-  padding: 2px 6px; border-radius: 4px;
-}
-.preview-box :deep(pre) {
-  background: var(--claude-ink); color: var(--claude-ivory);
-  padding: 16px; border-radius: var(--radius-lg); overflow-x: auto;
-  font-family: var(--font-mono); font-size: 13px;
-}
-.template-picker .hint { color: var(--claude-stone); font-size: 13px; margin: 0 0 12px; }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
-.form-actions {
-  display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end;
-  margin-top: 16px; padding-top: 16px;
-  border-top: 1px solid var(--claude-border-cream);
-}
 </style>

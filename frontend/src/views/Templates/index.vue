@@ -168,17 +168,4 @@ onMounted(loadList)
 
 <style scoped>
 .ds-tabs { margin-bottom: 24px; }
-.template-card .preview {
-  background: var(--claude-parchment);
-  border: 1px solid var(--claude-border-cream);
-  border-radius: var(--radius-lg);
-  padding: 12px 16px;
-  font-family: var(--font-mono);
-  font-size: 12px; line-height: 1.6;
-  color: var(--claude-olive);
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 160px; overflow: hidden;
-  margin: 0;
-}
 </style>

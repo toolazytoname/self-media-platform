@@ -145,16 +145,4 @@ onMounted(loadList)
 </script>
 
 <style scoped>
-.review-card .review-comment {
-  display: flex; align-items: flex-start; gap: 8px;
-  padding: 12px 16px;
-  background: var(--claude-border-cream);
-  border-radius: var(--radius-lg);
-  font-size: 13px; line-height: 1.55;
-  color: var(--claude-olive);
-}
-.review-card .meta {
-  display: flex; align-items: center; gap: 12px;
-  font-size: 12px; color: var(--claude-stone);
-}
 </style>

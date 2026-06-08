@@ -4,28 +4,36 @@
       <template #header>
         <div class="card-header">
           <div class="card-title">
-            <span>💡</span>
-            <span>选题库</span>
+            <span class="title-text">选题库</span>
             <el-tag v-if="total > 0" size="small" type="info" class="count-tag">{{ total }} 个</el-tag>
           </div>
-          <el-button type="primary" @click="openCreate">+ 新建选题</el-button>
+          <el-button type="primary" @click="openCreate">新建选题</el-button>
         </div>
       </template>
 
-      <div class="filter-bar">
+      <div class="ds-filter-bar">
         <el-select v-model="filterStatus" placeholder="状态" clearable @change="loadList" style="width: 130px">
           <el-option v-for="s in TOPIC_STATUSES" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
       </div>
 
-      <div v-if="loading && topics.length === 0" class="loading-state">加载中...</div>
-      <div v-else-if="topics.length === 0" class="empty-state">
-        <span>💡</span>
-        <p>暂无选题</p>
-        <p class="hint">点击上方按钮创建第一个选题</p>
+      <div v-if="loading && topics.length === 0" class="ds-loading">
+        <div class="spinner"></div>
+        <div>正在加载选题…</div>
+      </div>
+      <div v-else-if="topics.length === 0" class="ds-empty">
+        <div class="glyph">
+          <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M16 5a8 8 0 0 0-5 14c1 1 2 2 2 3v1h6v-1c0-1 1-2 2-3a8 8 0 0 0-5-14zM12 27h8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M13 24h6" stroke-linecap="round" />
+          </svg>
+        </div>
+        <h4>选题库是空的</h4>
+        <p>从新建选题开始，或者在 AI 工具里用「主题 + 平台」一键生成灵感。</p>
+        <el-button type="primary" @click="openCreate">新建第一个选题</el-button>
       </div>
       <div v-else class="topic-grid">
-        <div v-for="item in topics" :key="item.id" class="topic-card-item">
+        <div v-for="item in topics" :key="item.id" class="ds-item-card">
           <div class="card-header-row">
             <span class="topic-title">{{ item.title }}</span>
             <el-tag :type="getPriorityType(item.priority) as any" size="small">{{ item.priority }}级</el-tag>
@@ -36,9 +44,9 @@
             <span class="date">{{ formatDate(item.created_at) }}</span>
           </div>
           <div class="card-actions">
-            <el-button size="small" @click="openEdit(item)">✏️ 编辑</el-button>
-            <el-button size="small" v-if="item.status === 'active'" @click="markDone(item)">✓ 完成</el-button>
-            <el-button size="small" type="danger" @click="onDelete(item)">🗑 删除</el-button>
+            <el-button size="small" @click="openEdit(item)">编辑</el-button>
+            <el-button size="small" v-if="item.status === 'active'" @click="markDone(item)">完成</el-button>
+            <el-button size="small" type="danger" @click="onDelete(item)">删除</el-button>
           </div>
         </div>
       </div>
@@ -189,50 +197,17 @@ onMounted(loadList)
 
 <style scoped>
 .topic-page { padding: 0; }
-.topic-card {
-  background: rgba(26, 26, 46, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-}
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.card-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: #fff; }
 .count-tag { margin-left: 4px; }
-.filter-bar { display: flex; gap: 12px; margin-bottom: 20px; }
 .topic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-.topic-card-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: all 0.3s ease;
-}
-.topic-card-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(0, 212, 255, 0.2);
-  transform: translateY(-2px);
-}
-.card-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .topic-title { font-size: 15px; font-weight: 600; color: #fff; line-height: 1.4; flex: 1; }
 .topic-desc {
   font-size: 13px; color: #888; line-height: 1.5;
   overflow: hidden; text-overflow: ellipsis;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
-.card-footer {
-  display: flex; justify-content: space-between; align-items: center;
-  padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
 .status-tag { font-size: 12px; padding: 2px 8px; border-radius: 4px; }
 .status-tag.active { background: rgba(0, 212, 255, 0.1); color: #00d4ff; }
 .status-tag.done { background: rgba(0, 212, 100, 0.1); color: #00dc64; }
 .status-tag.archived { background: rgba(255, 255, 255, 0.1); color: #888; }
 .date { font-size: 12px; color: #666; }
-.card-actions { display: flex; gap: 6px; }
-.card-actions .el-button { flex: 1; font-size: 12px; padding: 6px 8px; }
-.empty-state, .loading-state { text-align: center; padding: 60px 20px; color: #666; }
-.empty-state span { font-size: 48px; display: block; margin-bottom: 16px; }
-.empty-state .hint { font-size: 13px; color: #444; margin-top: 8px; }
 </style>

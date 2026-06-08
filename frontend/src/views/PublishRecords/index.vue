@@ -129,6 +129,5 @@ onMounted(loadList)
 
 <style scoped>
 .ds-table { background: var(--claude-ivory); border-radius: var(--radius-xl); overflow: hidden; }
-.id-code { background: var(--claude-border-cream); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 .ds-table :deep(.ds-pill a) { color: inherit; }
 </style>

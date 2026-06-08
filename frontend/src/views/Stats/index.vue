@@ -224,21 +224,5 @@ onMounted(load)
   display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 16px;
 }
-.chart-card { min-height: 320px; }
-
-.bar-list { display: flex; flex-direction: column; gap: 14px; }
-.bar-row {
-  display: grid; grid-template-columns: 120px 1fr 50px;
-  align-items: center; gap: 12px;
-}
-.bar-track {
-  height: 8px; background: var(--claude-border-cream);
-  border-radius: 9999px; overflow: hidden;
-}
-.bar-fill {
-  height: 100%; border-radius: 9999px;
-  transition: width 0.3s ease;
-}
-.bar-value { text-align: right; font-size: 13px; color: var(--claude-ink); }
 .ds-empty--compact { padding: 32px 16px; }
 </style>

@@ -167,23 +167,6 @@ if (getStoredUser()) {
   padding: 40px 36px 32px;
   box-shadow: 0 4px 24px rgba(20, 20, 19, 0.04);
 }
-.card-eyebrow {
-  font-size: 12px; text-transform: uppercase; letter-spacing: 0.10em;
-  color: var(--claude-stone); font-weight: 500;
-  margin-bottom: 8px;
-}
-.card-title {
-  font-family: var(--font-serif);
-  font-size: 32px; font-weight: 500;
-  color: var(--claude-ink);
-  margin: 0 0 8px;
-  letter-spacing: -0.015em;
-}
-.card-lede {
-  font-size: 15px; color: var(--claude-olive);
-  margin: 0 0 24px; line-height: 1.55;
-}
-
 .login-tabs {
   margin-top: 8px;
 }
@@ -217,6 +200,5 @@ if (getStoredUser()) {
 @media (max-width: 480px) {
   .login-page { padding: 24px 16px; }
   .login-card { padding: 28px 24px 24px; }
-  .card-title { font-size: 26px; }
-}
+  }
 </style>

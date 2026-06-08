@@ -177,34 +177,4 @@ onMounted(loadList)
 
 <style scoped>
 .ds-tabs { margin-bottom: 24px; }
-.material-card { padding: 0; overflow: hidden; }
-.material-card .thumb {
-  position: relative; aspect-ratio: 4 / 3;
-  background: var(--claude-parchment);
-  display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
-}
-.material-card .thumb img { width: 100%; height: 100%; object-fit: cover; }
-.material-card .thumb .placeholder {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; height: 100%;
-  background: var(--claude-border-cream);
-}
-.material-card .type-badge {
-  position: absolute; top: 12px; right: 12px;
-}
-.material-card .material-body { padding: 16px 20px 0; }
-.material-card .title { font-size: 15px; }
-.material-card .path {
-  font-size: 12px; color: var(--claude-stone);
-  margin-top: 4px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.material-card .desc {
-  font-size: 13px; color: var(--claude-olive);
-  margin-top: 8px; line-height: 1.5;
-}
-.material-card .actions {
-  padding: 12px 20px; margin: 0;
-}
 </style>
