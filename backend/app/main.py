@@ -37,6 +37,7 @@ app = FastAPI(
     description="自媒体内容分发平台：AI生成 + 多平台分发 + CMS管理",
     version="1.1.0",
     lifespan=lifespan,
+    redirect_slashes=False,  # 不要 307 重定向, 前端用无尾斜杠路径
 )
 
 # CORS

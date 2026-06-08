@@ -50,6 +50,7 @@ VALID_PLATFORMS = {"douyin", "xiaohongshu", "bilibili", "toutiao", "wechat", "yo
 # ============ 路由 ============
 
 @router.post("/", response_model=ContentResponse, status_code=201)
+@router.post("", response_model=ContentResponse, status_code=201)
 async def create_content(content: ContentCreate):
     """创建内容"""
     if content.platform not in VALID_PLATFORMS:
@@ -59,6 +60,7 @@ async def create_content(content: ContentCreate):
 
 
 @router.get("/", response_model=ContentListResponse)
+@router.get("", response_model=ContentListResponse)
 async def list_content(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -122,7 +124,7 @@ async def submit_for_review(content_id: str):
     return {"message": "submitted for review", "content_id": content_id}
 
 
-@router.post("/{content_id}/duplicate")
+@router.post("/{content_id}/duplicate", status_code=201)
 async def duplicate_content(content_id: str):
     """复制内容（创建草稿副本）"""
     content = store.get_content(content_id)

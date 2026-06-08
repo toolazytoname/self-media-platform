@@ -1,0 +1,188 @@
+/* =================================================================
+   App Shell — Apple top nav (dark) + Claude sidebar (warm dark)
+   ================================================================= */
+
+* { box-sizing: border-box; }
+html, body, #app { margin: 0; padding: 0; height: 100%; }
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-page);
+  color: var(--text-primary);
+}
+
+/* ---- Top nav (Apple-style: dark, translucent, capsule CTAs) ---- */
+.app-topnav {
+  position: sticky; top: 0; z-index: 100;
+  height: 52px;
+  background: rgba(20, 20, 19, 0.88);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex; align-items: center;
+  padding: 0 24px;
+  gap: 24px;
+  color: var(--text-on-dark);
+}
+.app-topnav .brand {
+  display: flex; align-items: center; gap: 10px;
+  color: #f5f5f7; font-size: 14px; font-weight: 600;
+  letter-spacing: -0.01em; text-decoration: none;
+}
+.app-topnav .brand .glyph {
+  width: 24px; height: 24px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--claude-terracotta), var(--claude-coral));
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-serif); font-weight: 500; font-size: 14px; color: var(--claude-ivory);
+}
+.app-topnav .nav-links { display: flex; gap: 22px; flex: 1; }
+.app-topnav .nav-links a {
+  color: #f5f5f7; opacity: 0.78; text-decoration: none;
+  font-size: 13px; font-weight: 500; letter-spacing: -0.005em;
+  padding: 4px 0; transition: opacity 0.15s, color 0.15s;
+  position: relative;
+}
+.app-topnav .nav-links a:hover { opacity: 1; }
+.app-topnav .nav-links a.active { opacity: 1; }
+.app-topnav .nav-links a.active::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -16px;
+  height: 2px; background: var(--claude-coral); border-radius: 2px;
+}
+.app-topnav .nav-actions { display: flex; gap: 12px; align-items: center; }
+.app-topnav .search {
+  background: rgba(255, 255, 255, 0.10); color: #f5f5f7;
+  border: 0; border-radius: 8px; padding: 6px 12px;
+  font-size: 12px; width: 180px;
+  font-family: var(--font-sans);
+}
+.app-topnav .search::placeholder { color: var(--claude-warm-silver); }
+.app-topnav .user-pill {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255, 255, 255, 0.08); border-radius: 9999px;
+  padding: 3px 12px 3px 4px; color: #f5f5f7; font-size: 13px;
+  cursor: pointer; transition: background 0.15s;
+  font-weight: 500;
+}
+.app-topnav .user-pill:hover { background: rgba(255, 255, 255, 0.14); }
+.app-topnav .user-pill .avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--claude-terracotta), var(--claude-coral));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 500; font-size: 12px; color: var(--claude-ivory);
+  font-family: var(--font-serif);
+}
+
+/* ---- Body: sidebar + main ---- */
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 1px;
+  background: var(--claude-border-cream);
+}
+
+.app-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  color: var(--text-on-dark-secondary);
+  padding: 24px 0 24px;
+  position: sticky; top: 52px;
+  align-self: flex-start;
+  max-height: calc(100vh - 52px);
+  overflow-y: auto;
+}
+.app-sidebar .section-label {
+  padding: 16px 20px 6px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em;
+  color: rgba(255, 255, 255, 0.42);
+  font-weight: 500;
+}
+.app-sidebar nav { display: flex; flex-direction: column; }
+.app-sidebar nav a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px; color: rgba(255, 255, 255, 0.72); text-decoration: none;
+  font-size: 13px; font-weight: 500;
+  border-left: 2px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.app-sidebar nav a:hover { background: rgba(255, 255, 255, 0.04); color: #f5f5f7; }
+.app-sidebar nav a.active {
+  background: rgba(201, 100, 66, 0.12);
+  color: var(--claude-coral);
+  border-left-color: var(--claude-terracotta);
+}
+.app-sidebar nav a .icon {
+  width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+  color: rgba(255, 255, 255, 0.55);
+}
+.app-sidebar nav a.active .icon { color: var(--claude-coral); }
+
+.app-main {
+  flex: 1; min-width: 0;
+  background: var(--bg-page);
+}
+.app-main-inner {
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+  padding: 56px 40px 96px;
+  background: var(--bg-page);
+  min-height: calc(100vh - 52px);
+}
+
+/* ---- Page header (Claude editorial) ---- */
+.page-header {
+  margin-bottom: 48px;
+}
+.page-header .breadcrumb {
+  font-size: 13px; color: var(--text-tertiary);
+  margin-bottom: 12px;
+}
+.page-header .breadcrumb a { color: var(--text-secondary); }
+.page-header .breadcrumb a:hover { color: var(--claude-terracotta); }
+.page-header .page-title {
+  font-family: var(--font-serif);
+  font-size: 48px; font-weight: 500; line-height: 1.10;
+  letter-spacing: -0.02em; color: var(--text-primary);
+  margin: 0 0 12px;
+}
+.page-header .page-subtitle {
+  font-size: 18px; color: var(--text-secondary);
+  line-height: 1.55; max-width: 720px; margin: 0;
+  font-family: var(--font-serif); font-weight: 400;
+}
+.page-header .header-actions {
+  display: flex; gap: 12px; align-items: center;
+  margin-top: 24px;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 800px) {
+  .app-body { flex-direction: column; gap: 0; background: var(--bg-page); }
+  .app-sidebar {
+    width: 100%; max-height: none; position: static;
+    padding: 8px 0;
+  }
+  .app-sidebar .section-label, .app-sidebar .brand-wrap { display: none; }
+  .app-sidebar nav { flex-direction: row; overflow-x: auto; padding: 0 8px; gap: 0; }
+  .app-sidebar nav a {
+    white-space: nowrap;
+    border-left: 0; border-bottom: 2px solid transparent;
+    padding: 8px 14px;
+  }
+  .app-sidebar nav a.active {
+    border-left: 0; border-bottom-color: var(--claude-terracotta);
+  }
+  .app-topnav .nav-links { display: none; }
+  .app-topnav .search { display: none; }
+  .app-main-inner { padding: 24px 16px 48px; }
+  .page-header .page-title { font-size: 32px; }
+}
+
+/* 8-inch tablet landscape: keep sidebar but tighten content padding */
+@media (min-width: 801px) and (max-width: 1100px) {
+  .app-main-inner { padding: 40px 28px 80px; }
+  .app-sidebar { width: 200px; }
+}

@@ -1,63 +1,70 @@
 <template>
-  <div class="review-page">
-    <el-card class="review-card">
-      <template #header>
-        <div class="card-header">
-          <div class="card-title">
-            <span>✅</span>
-            <span>审核队列</span>
-            <el-badge :value="pendingCount" type="warning" class="badge" />
-            <el-tag v-if="tasks.length > 0" size="small" type="info" class="count-tag">{{ tasks.length }} 总</el-tag>
-          </div>
-          <el-radio-group v-model="filterStatus" @change="loadList" size="small">
-            <el-radio-button value="">全部</el-radio-button>
-            <el-radio-button value="pending">待审核</el-radio-button>
-            <el-radio-button value="approved">已通过</el-radio-button>
-            <el-radio-button value="rejected">已拒绝</el-radio-button>
-          </el-radio-group>
-        </div>
-      </template>
-
-      <div v-if="loading && tasks.length === 0" class="loading-state">加载中...</div>
-      <div v-else-if="tasks.length === 0" class="empty-state">
-        <span>✅</span>
-        <p>{{ filterStatus === 'pending' ? '没有待审核内容' : '暂无审核任务' }}</p>
-        <p class="hint">从内容列表点击"提交审核"后会出现在这里</p>
+  <div>
+    <header class="page-header">
+      <div class="breadcrumb">
+        <router-link to="/review">工作流</router-link>
+        <span>·</span>
+        <span>审核</span>
       </div>
-      <div v-else class="review-grid">
-        <div v-for="item in tasks" :key="item.id" class="review-card-item">
-          <div class="card-top">
-            <span class="content-title" @click="goContent(item.content_id)">{{ item.content_title }}</span>
-            <el-tag :type="(getStatusMeta(REVIEW_STATUSES, item.status).tagType) as any" size="small">
-              {{ getStatusMeta(REVIEW_STATUSES, item.status).label }}
-            </el-tag>
-          </div>
+      <h1 class="page-title">审核队列</h1>
+      <p class="page-subtitle">在这里处理待审核内容。通过后会进入发布流程，拒绝会退回作者修改。</p>
 
-          <div v-if="item.content_body" class="content-body-preview">
-            {{ truncate(item.content_body, 120) }}
-          </div>
-
-          <div v-if="item.reviewer_comment" class="review-comment">
-            📝 {{ item.reviewer_comment }}
-          </div>
-
-          <div class="card-footer">
-            <span class="date">{{ formatDate(item.created_at) }}</span>
-            <div class="action-buttons" v-if="item.status === 'pending'">
-              <el-button size="small" type="success" @click="approve(item)">✓ 通过</el-button>
-              <el-button size="small" type="danger" @click="reject(item)">✗ 拒绝</el-button>
-            </div>
-            <span v-else class="reviewed-label">
-              {{ formatDate(item.reviewed_at) }}
-            </span>
-          </div>
-        </div>
+      <div class="header-actions">
+        <el-radio-group v-model="filterStatus" @change="loadList" size="default">
+          <el-radio-button value="">全部</el-radio-button>
+          <el-radio-button value="pending">待审核</el-radio-button>
+          <el-radio-button value="approved">已通过</el-radio-button>
+          <el-radio-button value="rejected">已拒绝</el-radio-button>
+        </el-radio-group>
       </div>
-    </el-card>
+    </header>
 
-    <!-- 拒绝原因对话框 -->
-    <el-dialog v-model="showRejectDialog" title="拒绝原因" width="420px">
-      <el-input v-model="rejectComment" type="textarea" :rows="3" placeholder="请说明拒绝原因..." />
+    <div v-if="loading && tasks.length === 0" class="ds-loading">
+      <div class="spinner"></div>
+      <div>正在加载审核任务…</div>
+    </div>
+
+    <div v-else-if="tasks.length === 0" class="ds-empty">
+      <div class="glyph">
+        <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M8 16l5 5 11-12" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </div>
+      <h4>{{ filterStatus === 'pending' ? '没有待审核内容' : '队列为空' }}</h4>
+      <p>{{ filterStatus === 'pending' ? '从内容列表提交审核后，任务会出现在这里。' : '试试切换到其他筛选。' }}</p>
+    </div>
+
+    <div v-else class="ds-card-grid">
+      <article v-for="item in tasks" :key="item.id" class="ds-item-card review-card">
+        <div class="head">
+          <h3 class="title" @click="goContent(item.content_id)">{{ item.content_title }}</h3>
+          <span class="ds-status" :class="statusClass(item.status)">
+            <span class="dot"></span>
+            {{ getStatusMeta(REVIEW_STATUSES, item.status).label }}
+          </span>
+        </div>
+        <p v-if="item.content_body" class="body">{{ truncate(item.content_body, 140) }}</p>
+        <div v-if="item.reviewer_comment" class="review-comment">
+          <span class="ds-pill ds-pill--warning">审核意见</span>
+          <span>{{ item.reviewer_comment }}</span>
+        </div>
+        <div class="meta">
+          <span class="caption">提交时间</span>
+          <span class="mono">{{ formatDate(item.created_at) }}</span>
+        </div>
+        <div class="actions" v-if="item.status === 'pending'">
+          <el-button size="small" type="success" @click="approve(item)">通过</el-button>
+          <el-button size="small" type="danger" @click="reject(item)">拒绝</el-button>
+        </div>
+      </article>
+    </div>
+
+    <el-dialog v-model="showRejectDialog" title="拒绝审核" width="480px">
+      <el-form label-position="top">
+        <el-form-item label="拒绝原因">
+          <el-input v-model="rejectComment" type="textarea" :rows="3" placeholder="请说明拒绝原因..." />
+        </el-form-item>
+      </el-form>
       <template #footer>
         <el-button @click="showRejectDialog = false">取消</el-button>
         <el-button type="danger" @click="confirmReject" :loading="rejecting">确认拒绝</el-button>
@@ -83,20 +90,20 @@ const rejectTarget = ref<ReviewTask | null>(null)
 const filterStatus = ref('')
 
 const pendingCount = computed(() => tasks.value.filter(t => t.status === 'pending').length)
-
 const truncate = (text: string, len: number) => text.length > len ? text.slice(0, len) + '…' : text
-
 const goContent = (id: string) => router.push(`/content/view/${id}`)
+const statusClass = (s: string) => {
+  if (s === 'approved') return 'ds-status--success'
+  if (s === 'pending') return 'ds-status--warning'
+  if (s === 'rejected') return 'ds-status--error'
+  return 'ds-status--neutral'
+}
 
 const loadList = async () => {
   loading.value = true
-  try {
-    tasks.value = await reviewApi.list(filterStatus.value || undefined)
-  } catch (e: any) {
-    ElMessage.error('加载失败: ' + (e.normalizedMessage || e.message))
-  } finally {
-    loading.value = false
-  }
+  try { tasks.value = await reviewApi.list(filterStatus.value || undefined) }
+  catch (e: any) { ElMessage.error('加载失败: ' + (e.normalizedMessage || e.message)) }
+  finally { loading.value = false }
 }
 
 const approve = async (item: ReviewTask) => {
@@ -109,9 +116,7 @@ const approve = async (item: ReviewTask) => {
     await reviewApi.update(item.id, { status: 'approved' })
     ElMessage.success('已通过')
     loadList()
-  } catch (e: any) {
-    ElMessage.error('操作失败: ' + (e.normalizedMessage || e.message))
-  }
+  } catch (e: any) { ElMessage.error('操作失败: ' + (e.normalizedMessage || e.message)) }
 }
 
 const reject = (item: ReviewTask) => {
@@ -122,65 +127,34 @@ const reject = (item: ReviewTask) => {
 
 const confirmReject = async () => {
   if (!rejectTarget.value) return
+  if (!rejectComment.value.trim()) {
+    ElMessage.warning('请填写拒绝原因')
+    return
+  }
   rejecting.value = true
   try {
-    await reviewApi.update(rejectTarget.value.id, {
-      status: 'rejected',
-      comment: rejectComment.value || '未通过',
-    })
+    await reviewApi.update(rejectTarget.value.id, { status: 'rejected', reviewer_comment: rejectComment.value })
     ElMessage.success('已拒绝')
     showRejectDialog.value = false
     loadList()
-  } catch (e: any) {
-    ElMessage.error('操作失败: ' + (e.normalizedMessage || e.message))
-  } finally {
-    rejecting.value = false
-  }
+  } catch (e: any) { ElMessage.error('操作失败: ' + (e.normalizedMessage || e.message)) }
+  finally { rejecting.value = false }
 }
 
 onMounted(loadList)
 </script>
 
 <style scoped>
-.review-page { padding: 0; }
-.review-card {
-  background: rgba(26, 26, 46, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+.review-card .review-comment {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 12px 16px;
+  background: var(--claude-border-cream);
+  border-radius: var(--radius-lg);
+  font-size: 13px; line-height: 1.55;
+  color: var(--claude-olive);
 }
-.card-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-.card-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: #fff; }
-.badge { margin-left: 8px; }
-.count-tag { margin-left: 4px; }
-.review-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-.review-card-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: all 0.3s ease;
+.review-card .meta {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 12px; color: var(--claude-stone);
 }
-.review-card-item:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(0, 212, 255, 0.2); }
-.card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.content-title { font-size: 15px; font-weight: 600; color: #fff; line-height: 1.4; flex: 1; cursor: pointer; transition: color 0.2s; }
-.content-title:hover { color: #00d4ff; }
-.content-body-preview {
-  font-size: 13px; color: #888; line-height: 1.5;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 8px 10px;
-  border-radius: 6px;
-}
-.review-comment { font-size: 13px; color: #888; background: rgba(255, 71, 87, 0.05); border-left: 3px solid #ff4757; padding: 10px 12px; border-radius: 4px; line-height: 1.5; }
-.card-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.05); }
-.date { font-size: 12px; color: #666; }
-.action-buttons { display: flex; gap: 8px; }
-.reviewed-label { font-size: 12px; color: #888; }
-.empty-state, .loading-state { text-align: center; padding: 60px 20px; color: #666; }
-.empty-state span { font-size: 48px; display: block; margin-bottom: 16px; }
-.empty-state .hint { font-size: 13px; color: #444; margin-top: 8px; }
 </style>

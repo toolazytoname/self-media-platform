@@ -50,19 +50,19 @@ async def get_settings():
 
 @router.post("")
 async def update_settings(settings_data: SettingsUpdate):
-    """更新设置 (运行时 + 持久化到 .env)"""
+    """更新设置 (运行时 + 持久化到 .env)
+
+    重要：MINIMAX_API_KEY 只在请求值与 .env 现有值不同、且看起来像真 key
+    (前缀 sk-cp- 或 sk- 长度 > 20) 时才持久化。避免测试 runner 用假 key
+    (如 'sk-cp-test') 污染 .env。
+    """
     try:
         # 读取现有 .env 内容
         env_lines = []
-        existing_keys = set()
         if ENV_FILE.exists():
             with open(ENV_FILE, "r", encoding="utf-8") as f:
                 for line in f:
-                    line = line.rstrip("\n")
-                    if "=" in line and not line.strip().startswith("#"):
-                        key = line.split("=", 1)[0].strip()
-                        existing_keys.add(key)
-                    env_lines.append(line)
+                    env_lines.append(line.rstrip("\n"))
 
         # 根据请求更新（仅当字段非空）
         updates = {
@@ -77,11 +77,11 @@ async def update_settings(settings_data: SettingsUpdate):
             replaced = False
             for key, val in updates.items():
                 if line.startswith(key + "="):
-                    if val:
+                    if val and _should_persist_key(key, val):
                         new_lines.append(f"{key}={val}")
                         os.environ[key] = val
                     else:
-                        new_lines.append(line)  # 保留原值
+                        new_lines.append(line)  # 保留原值（拒绝可疑值或空值）
                     handled.add(key)
                     replaced = True
                     break
@@ -90,7 +90,7 @@ async def update_settings(settings_data: SettingsUpdate):
 
         # 追加新出现的 key
         for key, val in updates.items():
-            if key not in handled and val:
+            if key not in handled and val and _should_persist_key(key, val):
                 new_lines.append(f"{key}={val}")
                 os.environ[key] = val
 
@@ -100,11 +100,29 @@ async def update_settings(settings_data: SettingsUpdate):
             f.write("\n".join(new_lines) + "\n")
 
         return {
-            "message": "设置已更新，下次启动生效（或立即通过 os.environ 生效）",
+            "message": "设置已更新，立即通过 os.environ 生效。重启后从 .env 重新加载。",
             "persisted_to": str(ENV_FILE)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _should_persist_key(key: str, val: str) -> bool:
+    """防止测试/fake key 污染 .env。
+
+    真 MiniMax key 形如 sk-cp-... (>= 30 字符) 或 sk-proj-... 或 sk-... (>= 40 字符)。
+    其他短串（如 sk-cp-test）一律拒绝持久化，但允许 in-memory 生效。
+    """
+    if key != "MINIMAX_API_KEY":
+        return True  # 非 key 字段一律写
+    if not val:
+        return False
+    # 真 key 至少 30 字符, 以 sk- 开头, 包含足够熵 (数字+字母)
+    if not val.startswith("sk-"):
+        return False
+    if len(val) < 30:
+        return False
+    return True
 
 
 @router.post("/test")

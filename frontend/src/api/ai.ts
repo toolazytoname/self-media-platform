@@ -9,8 +9,15 @@ export const aiApi = {
     request.post<{ copy: string; platform: string }, { copy: string; platform: string }>('/ai/copy', { topic, platform, content_type }),
   videoScript: (topic: string, duration?: number) =>
     request.post<{ script: string; duration: number }, { script: string; duration: number }>('/ai/video/script', { topic, duration }),
-  image: (prompt: string) =>
-    request.post<{ image_url: string }, { image_url: string }>('/ai/image', { prompt }),
+  image: (params: { prompt: string; style?: string; ratio?: string; n?: number; negative_prompt?: string }) =>
+    request.post<
+      { items: any[]; count: number; is_mock: boolean; error?: string },
+      { items: any[]; count: number; is_mock: boolean; error?: string }
+    >('/ai/image', params),
+  imageList: (limit = 50) =>
+    request.get<{ total: number; items: any[] }, { total: number; items: any[] }>(`/ai/image/list?limit=${limit}`),
+  imageDelete: (id: string) =>
+    request.delete<{ ok: boolean; id: string }, { ok: boolean; id: string }>(`/ai/image/${id}`),
   videoGenerate: (prompt: string) =>
     request.post<{ job_id: string; status: string }, { job_id: string; status: string }>('/ai/video/generate', { prompt }),
   videoStatus: (jobId: string) =>

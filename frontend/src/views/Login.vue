@@ -1,18 +1,18 @@
 <template>
   <div class="login-page">
-    <div class="login-bg">
-      <div class="bg-blob blob-1"></div>
-      <div class="bg-blob blob-2"></div>
-      <div class="bg-blob blob-3"></div>
-    </div>
-    <div class="login-container">
-      <div class="login-brand">
-        <div class="brand-icon">📱</div>
-        <h1>自媒体内容平台</h1>
-        <p>AI 驱动 · 多平台分发 · 一键搞定</p>
-      </div>
+    <!-- Parchment background, no gradients, no decorative blobs -->
+    <div class="login-frame">
+      <header class="brand">
+        <div class="glyph">S</div>
+        <h1>Self-Media Platform</h1>
+        <p>AI 驱动的内容创作与多平台分发</p>
+      </header>
 
-      <el-card class="login-card">
+      <section class="login-card">
+        <div class="card-eyebrow">登录或注册</div>
+        <h2 class="card-title">欢迎回来</h2>
+        <p class="card-lede">用你的账号继续创作。密码至少 6 位，新账号 3 秒内可用。</p>
+
         <el-tabs v-model="activeTab" class="login-tabs">
           <el-tab-pane label="登录" name="login">
             <el-form :model="loginForm" label-position="top" @keyup.enter="onLogin">
@@ -22,14 +22,15 @@
               <el-form-item label="密码">
                 <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" size="large" :prefix-icon="Lock" show-password />
               </el-form-item>
-              <el-button type="primary" size="large" :loading="loading" style="width: 100%; margin-top: 8px" @click="onLogin">
-                登 录
+              <el-button type="primary" size="large" :loading="loading" class="primary-cta" @click="onLogin">
+                {{ loading ? '登录中…' : '登录' }}
               </el-button>
               <div class="login-hint">
                 还没有账号？<el-link type="primary" @click="activeTab = 'register'">立即注册</el-link>
               </div>
             </el-form>
           </el-tab-pane>
+
           <el-tab-pane label="注册" name="register">
             <el-form :model="regForm" label-position="top" @keyup.enter="onRegister">
               <el-form-item label="用户名">
@@ -44,8 +45,8 @@
               <el-form-item label="确认密码">
                 <el-input v-model="regForm.password2" type="password" placeholder="再次输入密码" size="large" :prefix-icon="Lock" show-password />
               </el-form-item>
-              <el-button type="primary" size="large" :loading="loading" style="width: 100%; margin-top: 8px" @click="onRegister">
-                注 册
+              <el-button type="primary" size="large" :loading="loading" class="primary-cta" @click="onRegister">
+                {{ loading ? '创建中…' : '注册' }}
               </el-button>
               <div class="login-hint">
                 已有账号？<el-link type="primary" @click="activeTab = 'login'">去登录</el-link>
@@ -53,7 +54,11 @@
             </el-form>
           </el-tab-pane>
         </el-tabs>
-      </el-card>
+      </section>
+
+      <footer class="footnote">
+        Self-Media Platform · 基于 Claude × Apple 设计系统
+      </footer>
     </div>
   </div>
 </template>
@@ -79,12 +84,12 @@ const onLogin = async () => {
   }
   loading.value = true
   try {
-    const res = await authApi.login(loginForm.value)
-    setAuth(res.access_token, res.user)
-    ElMessage.success('登录成功')
+    const resp = await authApi.login(loginForm.value.username, loginForm.value.password)
+    setAuth(resp.access_token, resp.user)
+    ElMessage.success(`欢迎回来, ${resp.user.display_name || resp.user.username}`)
     router.push('/content')
   } catch (e: any) {
-    ElMessage.error(e.normalizedMessage || '登录失败')
+    ElMessage.error(e?.response?.data?.detail || '登录失败')
   } finally {
     loading.value = false
   }
@@ -105,139 +110,113 @@ const onRegister = async () => {
   }
   loading.value = true
   try {
-    const res = await authApi.register({
-      username: regForm.value.username,
-      password: regForm.value.password,
-      display_name: regForm.value.display_name || undefined,
-    })
-    setAuth(res.access_token, res.user)
-    ElMessage.success('注册成功并已登录')
+    const resp = await authApi.register(regForm.value.username, regForm.value.password, regForm.value.display_name)
+    setAuth(resp.access_token, resp.user)
+    ElMessage.success('注册成功，已登录')
     router.push('/content')
   } catch (e: any) {
-    ElMessage.error(e.normalizedMessage || '注册失败')
+    ElMessage.error(e?.response?.data?.detail || '注册失败')
   } finally {
     loading.value = false
   }
 }
 
-// 已登录直接跳过
 if (getStoredUser()) {
-  router.replace('/content')
+  router.push('/content')
 }
 </script>
 
 <style scoped>
 .login-page {
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #0f0f1a;
-  position: relative;
-  overflow: hidden;
+  min-height: 100vh;
+  background: var(--claude-parchment);
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 24px;
+}
+.login-frame {
+  width: 100%; max-width: 440px;
+  display: flex; flex-direction: column; gap: 32px;
 }
 
-.login-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-.bg-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.4;
-}
-
-.blob-1 {
-  width: 400px;
-  height: 400px;
-  background: linear-gradient(135deg, #00d4ff 0%, #0066ff 100%);
-  top: -100px;
-  left: -100px;
-}
-
-.blob-2 {
-  width: 350px;
-  height: 350px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  bottom: -100px;
-  right: -100px;
-}
-
-.blob-3 {
-  width: 300px;
-  height: 300px;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.login-container {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 420px;
-  padding: 0 20px;
-}
-
-.login-brand {
+.brand {
   text-align: center;
-  margin-bottom: 32px;
-  color: #fff;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
-
-.brand-icon {
-  font-size: 56px;
+.brand .glyph {
+  width: 56px; height: 56px; border-radius: 16px;
+  background: linear-gradient(135deg, var(--claude-terracotta), var(--claude-coral));
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-serif); font-size: 28px; font-weight: 500; color: var(--claude-ivory);
   margin-bottom: 8px;
 }
-
-.login-brand h1 {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  margin-bottom: 4px;
+.brand h1 {
+  font-family: var(--font-serif);
+  font-size: 28px; font-weight: 500;
+  color: var(--claude-ink);
+  margin: 0; letter-spacing: -0.01em;
 }
-
-.login-brand p {
-  font-size: 14px;
-  color: #a0a0b0;
+.brand p {
+  font-size: 15px; color: var(--claude-olive);
+  margin: 0;
 }
 
 .login-card {
-  background: rgba(26, 26, 46, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  background: var(--claude-ivory);
+  border: 1px solid var(--claude-border-cream);
+  border-radius: 20px;
+  padding: 40px 36px 32px;
+  box-shadow: 0 4px 24px rgba(20, 20, 19, 0.04);
+}
+.card-eyebrow {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.10em;
+  color: var(--claude-stone); font-weight: 500;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-family: var(--font-serif);
+  font-size: 32px; font-weight: 500;
+  color: var(--claude-ink);
+  margin: 0 0 8px;
+  letter-spacing: -0.015em;
+}
+.card-lede {
+  font-size: 15px; color: var(--claude-olive);
+  margin: 0 0 24px; line-height: 1.55;
 }
 
-.login-tabs :deep(.el-tabs__header) {
-  margin-bottom: 24px;
+.login-tabs {
+  margin-top: 8px;
 }
-
+.login-tabs :deep(.el-tabs__header) { margin-bottom: 24px; }
 .login-tabs :deep(.el-tabs__item) {
-  font-size: 16px;
-  font-weight: 500;
-  color: #a0a0b0;
-  height: 48px;
-  line-height: 48px;
+  font-size: 15px; font-weight: 500;
+  height: 44px; line-height: 44px;
+  padding: 0 18px;
 }
 
-.login-tabs :deep(.el-tabs__item.is-active) {
-  color: #00d4ff;
+.primary-cta {
+  width: 100%; margin-top: 8px;
+  background: var(--claude-terracotta) !important;
+  border: 0 !important; color: var(--claude-ivory) !important;
+  border-radius: 12px !important;
+  height: 46px !important; font-size: 15px !important; font-weight: 500 !important;
 }
-
-.login-tabs :deep(.el-tabs__active-bar) {
-  background: #00d4ff;
-}
+.primary-cta:hover { background: var(--claude-coral) !important; }
 
 .login-hint {
+  text-align: center; margin-top: 18px;
+  font-size: 13px; color: var(--claude-stone);
+}
+
+.footnote {
   text-align: center;
-  margin-top: 16px;
-  font-size: 13px;
-  color: #a0a0b0;
+  font-size: 12px; color: var(--claude-stone);
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 480px) {
+  .login-page { padding: 24px 16px; }
+  .login-card { padding: 28px 24px 24px; }
+  .card-title { font-size: 26px; }
 }
 </style>

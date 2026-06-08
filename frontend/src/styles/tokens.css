@@ -1,0 +1,106 @@
+/* =================================================================
+   Design Tokens — Apple (chrome) + Claude (body)
+   Locked constitution from ~/.config/opencode/skill/open-design/
+   ================================================================= */
+
+:root {
+  /* ---- Apple chrome tokens ---- */
+  --apple-black: #000000;
+  --apple-gray: #f5f5f7;
+  --apple-white: #ffffff;
+  --apple-ink: #1d1d1f;
+  --apple-blue: #0071e3;
+  --apple-link: #0066cc;
+  --apple-bright-link: #2997ff;
+  --apple-text-secondary: #6e6e73;
+  --apple-border-soft: #d2d2d7;
+  --apple-border-strong: #86868b;
+  --apple-graphite-a: #272729;
+  --apple-graphite-b: #262629;
+  --apple-graphite-c: #28282b;
+  --apple-graphite-d: #2a2a2c;
+  --apple-utility-dark: #424245;
+
+  /* ---- Claude body tokens ---- */
+  --claude-parchment: #f5f4ed;
+  --claude-ivory: #faf9f5;
+  --claude-ink: #141413;
+  --claude-ink-soft: #30302e;
+  --claude-terracotta: #c96442;
+  --claude-coral: #d97757;
+  --claude-olive: #5e5d59;
+  --claude-stone: #87867f;
+  --claude-warm-silver: #b0aea5;
+  --claude-error: #b53333;
+  --claude-success: #10b981;
+  --claude-border-cream: #f0eee6;
+  --claude-border-warm: #e8e6dc;
+  --claude-ring-warm: #d1cfc5;
+  --claude-ring-deep: #c2c0b6;
+  --claude-sand: #e8e6dc;
+  --claude-focus-blue: #3898ec;
+
+  /* ---- Semantic aliases (use these in components) ---- */
+  --bg-page: var(--claude-parchment);
+  --bg-card: var(--claude-ivory);
+  --bg-card-elevated: var(--claude-white);
+  --bg-dark: var(--apple-black);
+  --bg-dark-surface: var(--apple-graphite-c);
+  --bg-sidebar: var(--claude-ink);
+  --bg-sidebar-item-hover: rgba(255, 255, 255, 0.05);
+
+  --text-primary: var(--claude-ink);
+  --text-secondary: var(--claude-olive);
+  --text-tertiary: var(--claude-stone);
+  --text-on-dark: #f5f5f7;
+  --text-on-dark-secondary: var(--claude-warm-silver);
+  --text-link: var(--claude-terracotta);
+  --text-error: var(--claude-error);
+  --text-success: var(--claude-success);
+
+  --border-soft: var(--claude-border-cream);
+  --border-medium: var(--claude-border-warm);
+  --border-strong: var(--claude-ring-warm);
+  --border-dark: rgba(255, 255, 255, 0.08);
+
+  --cta-primary-bg: var(--claude-terracotta);
+  --cta-primary-text: var(--claude-ivory);
+  --cta-primary-hover: var(--claude-coral);
+  --cta-secondary-bg: var(--claude-sand);
+  --cta-secondary-text: var(--claude-ink);
+  --cta-ghost-text: var(--claude-olive);
+  --cta-danger-bg: var(--claude-error);
+  --cta-danger-text: var(--claude-ivory);
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-pill: 9999px;
+
+  --shadow-ring: 0 0 0 1px var(--claude-ring-warm);
+  --shadow-whisper: 0 4px 24px rgba(20, 20, 19, 0.05);
+  --shadow-card: 0 1px 0 rgba(20, 20, 19, 0.02);
+  --shadow-focus: 0 0 0 3px rgba(56, 152, 236, 0.15);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+  --space-11: 80px;
+  --space-12: 96px;
+
+  --font-serif: "Anthropic Serif", Georgia, "Songti SC", "Noto Serif SC", serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Anthropic Mono", "Berkeley Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  --max-content-width: 1200px;
+}

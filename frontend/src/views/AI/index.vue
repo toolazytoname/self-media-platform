@@ -1,39 +1,56 @@
 <template>
-  <div class="ai-page">
-    <el-card class="ai-card">
-      <template #header>
-        <div class="card-header">
-          <div class="card-title">
-            <span>🤖</span>
-            <span>AI 智能生成</span>
-          </div>
-        </div>
-      </template>
+  <div>
+    <header class="page-header">
+      <div class="breadcrumb">
+        <router-link to="/ai">AI 工具</router-link>
+        <span>·</span>
+        <span>智能生成</span>
+      </div>
+      <h1 class="page-title">AI 智能生成</h1>
+      <p class="page-subtitle">用 MiniMax 系列模型处理内容创作：摘要、播客、文案、视频脚本、图像，一站式。</p>
+    </header>
 
-      <el-tabs v-model="activeTab" class="ai-tabs">
-        <!-- 内容摘要 -->
-        <el-tab-pane label="📝 内容摘要" name="summary">
+    <el-tabs v-model="activeTab" class="ai-tabs ds-tabs">
+      <!-- 内容摘要 -->
+      <el-tab-pane name="summary">
+        <template #label>
+          <span class="tab-label">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10M3 6h10M3 9h7M3 12h4" stroke-linecap="round" /></svg>
+            <span>内容摘要</span>
+          </span>
+        </template>
+        <section class="ds-card ai-tab-card">
+          <h2 class="ds-card__title">把长文变摘要</h2>
+          <p class="ds-card__lede">粘贴文章、链接内容、PDF 文本，自动提取关键要点。</p>
           <el-form :model="forms.summary" label-position="top">
             <el-form-item label="输入内容">
               <el-input v-model="forms.summary.content" type="textarea" :rows="8"
                        placeholder="粘贴文章或长文本..." maxlength="20000" show-word-limit />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="genSummary" :loading="loading.summary" :disabled="!forms.summary.content">
-                生成摘要
+              <el-button class="primary-cta" :loading="loading.summary" :disabled="!forms.summary.content" @click="genSummary">
+                {{ loading.summary ? '生成中…' : '生成摘要' }}
               </el-button>
             </el-form-item>
-            <el-form-item v-if="results.summary" label="生成结果">
-              <div class="result-box">
-                <div class="result-text">{{ results.summary.summary }}</div>
-                <div class="result-meta">原文长度: {{ results.summary.original_length }} 字符</div>
-              </div>
-            </el-form-item>
+            <div v-if="results.summary" class="result-block">
+              <div class="result-text">{{ results.summary.summary }}</div>
+              <div class="result-meta">原文长度: {{ results.summary.original_length }} 字符</div>
+            </div>
           </el-form>
-        </el-tab-pane>
+        </section>
+      </el-tab-pane>
 
-        <!-- 播客脚本 -->
-        <el-tab-pane label="🎙️ 播客脚本" name="podcast">
+      <!-- 播客脚本 -->
+      <el-tab-pane name="podcast">
+        <template #label>
+          <span class="tab-label">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="2" width="6" height="9" rx="3" /><path d="M3 8a5 5 0 0010 0M8 13v2" stroke-linecap="round" /></svg>
+            <span>播客脚本</span>
+          </span>
+        </template>
+        <section class="ds-card ai-tab-card">
+          <h2 class="ds-card__title">双人对话脚本</h2>
+          <p class="ds-card__lede">把内容转成主播 A / 主播 B 的对话脚本，可直接朗读。</p>
           <el-form :model="forms.podcast" label-position="top">
             <el-form-item label="输入内容">
               <el-input v-model="forms.podcast.content" type="textarea" :rows="8"
@@ -47,24 +64,29 @@
               </el-radio-group>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="genPodcast" :loading="loading.podcast" :disabled="!forms.podcast.content">
-                生成脚本
+              <el-button class="primary-cta" :loading="loading.podcast" :disabled="!forms.podcast.content" @click="genPodcast">
+                {{ loading.podcast ? '生成中…' : '生成脚本' }}
               </el-button>
             </el-form-item>
-            <el-form-item v-if="results.podcast" label="生成结果">
-              <div class="result-box">
-                <div class="result-text">{{ results.podcast.script }}</div>
-                <div class="result-meta">
-                  角色: {{ (results.podcast.characters || []).join(' / ') }} |
-                  预计时长: {{ results.podcast.estimated_duration }}
-                </div>
-              </div>
-            </el-form-item>
+            <div v-if="results.podcast" class="result-block">
+              <div class="result-text">{{ results.podcast.script }}</div>
+              <div class="result-meta">角色: {{ (results.podcast.characters || []).join(' / ') }} · 预计时长: {{ results.podcast.estimated_duration }}</div>
+            </div>
           </el-form>
-        </el-tab-pane>
+        </section>
+      </el-tab-pane>
 
-        <!-- 多平台文案 -->
-        <el-tab-pane label="📱 多平台文案" name="copy">
+      <!-- 多平台文案 -->
+      <el-tab-pane name="copy">
+        <template #label>
+          <span class="tab-label">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5h12v8H2z M5 8h6" stroke-linecap="round" /></svg>
+            <span>多平台文案</span>
+          </span>
+        </template>
+        <section class="ds-card ai-tab-card">
+          <h2 class="ds-card__title">平台定制文案</h2>
+          <p class="ds-card__lede">给同一个主题生成不同平台的发布文案。抖音短、小红书温暖、公众号深度。</p>
           <el-form :model="forms.copy" label-position="top">
             <el-form-item label="主题">
               <el-input v-model="forms.copy.topic" placeholder="例如：AI 改变生活" />
@@ -75,21 +97,29 @@
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="genCopy" :loading="loading.copy" :disabled="!forms.copy.topic">
-                生成文案
+              <el-button class="primary-cta" :loading="loading.copy" :disabled="!forms.copy.topic" @click="genCopy">
+                {{ loading.copy ? '生成中…' : '生成文案' }}
               </el-button>
             </el-form-item>
-            <el-form-item v-if="results.copy" label="生成结果">
-              <div class="result-box">
-                <div class="result-text">{{ results.copy.copy }}</div>
-                <div class="result-meta">目标平台: {{ getPlatformName(results.copy.platform) }}</div>
-              </div>
-            </el-form-item>
+            <div v-if="results.copy" class="result-block">
+              <div class="result-text">{{ results.copy.copy }}</div>
+              <div class="result-meta">目标平台: {{ getPlatformName(results.copy.platform) }}</div>
+            </div>
           </el-form>
-        </el-tab-pane>
+        </section>
+      </el-tab-pane>
 
-        <!-- 视频脚本 -->
-        <el-tab-pane label="🎬 视频脚本" name="video-script">
+      <!-- 视频脚本 -->
+      <el-tab-pane name="video-script">
+        <template #label>
+          <span class="tab-label">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4l9 4-9 4z" stroke-linejoin="round" /></svg>
+            <span>视频脚本</span>
+          </span>
+        </template>
+        <section class="ds-card ai-tab-card">
+          <h2 class="ds-card__title">分镜脚本</h2>
+          <p class="ds-card__lede">生成含画面、字幕、配乐建议的视频脚本。</p>
           <el-form :model="forms.videoScript" label-position="top">
             <el-form-item label="主题">
               <el-input v-model="forms.videoScript.topic" placeholder="例如：3 分钟了解 Vibe Coding" />
@@ -98,66 +128,145 @@
               <el-input-number v-model="forms.videoScript.duration" :min="15" :max="600" :step="15" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="genVideoScript" :loading="loading.videoScript" :disabled="!forms.videoScript.topic">
-                生成脚本
+              <el-button class="primary-cta" :loading="loading.videoScript" :disabled="!forms.videoScript.topic" @click="genVideoScript">
+                {{ loading.videoScript ? '生成中…' : '生成脚本' }}
               </el-button>
             </el-form-item>
-            <el-form-item v-if="results.videoScript" label="生成结果">
-              <div class="result-box">
-                <div class="result-text">{{ results.videoScript.script }}</div>
-                <div class="result-meta">时长: {{ results.videoScript.duration }} 秒</div>
-              </div>
-            </el-form-item>
+            <div v-if="results.videoScript" class="result-block">
+              <div class="result-text">{{ results.videoScript.script }}</div>
+              <div class="result-meta">时长: {{ results.videoScript.duration }} 秒</div>
+            </div>
           </el-form>
-        </el-tab-pane>
+        </section>
+      </el-tab-pane>
 
-        <!-- 图像生成 -->
-        <el-tab-pane label="🖼️ 图像生成" name="image">
-          <el-form :model="forms.image" label-position="top">
-            <el-form-item label="图像描述 (英文 prompt 效果更佳)">
-              <el-input v-model="forms.image.prompt" type="textarea" :rows="3"
-                       placeholder="例如：A cute cat sitting on a laptop keyboard, soft lighting, high quality" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="genImage" :loading="loading.image" :disabled="!forms.image.prompt">
-                生成图像
-              </el-button>
-            </el-form-item>
-            <el-form-item v-if="results.image" label="生成结果">
-              <div class="result-box">
-                <img v-if="results.image.image_url" :src="results.image.image_url" alt="AI generated" class="generated-image" @error="onImgError" />
-                <div v-else class="result-text">⚠️ 图像生成服务未配置（请在设置中检查 API Key）</div>
+      <!-- 图像生成 (Apple shell + Claude body design) -->
+      <el-tab-pane name="image">
+        <template #label>
+          <span class="tab-label">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="10" height="10" rx="1.5" /><circle cx="6" cy="6" r="1" /><path d="M3 11l3-3 3 3 2-2 2 2" stroke-linejoin="round" /></svg>
+            <span>图像生成</span>
+          </span>
+        </template>
+        <div class="image-gen-wrap">
+          <div class="image-gen-card">
+            <h3 class="card-title">把文字变成图片</h3>
+            <p class="card-lede">image-01 驱动 · 越具体效果越好</p>
+
+            <el-form :model="forms.image" label-position="top" class="image-form">
+              <el-form-item label="提示词">
+                <el-input v-model="forms.image.prompt" type="textarea" :rows="3"
+                         placeholder="例如：一只橘猫坐在窗台看雨，傍晚城市天际线，35mm 胶片感" />
+              </el-form-item>
+
+              <div class="image-form-row">
+                <el-form-item label="风格">
+                  <el-radio-group v-model="forms.image.style" size="small">
+                    <el-radio-button value="写实摄影">写实</el-radio-button>
+                    <el-radio-button value="插画">插画</el-radio-button>
+                    <el-radio-button value="3D 渲染">3D</el-radio-button>
+                    <el-radio-button value="水墨">水墨</el-radio-button>
+                    <el-radio-button value="极简矢量">矢量</el-radio-button>
+                  </el-radio-group>
+                </el-form-item>
               </div>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
 
-        <!-- 视频生成 -->
-        <el-tab-pane label="🎥 视频生成" name="video">
-          <el-form :model="forms.video" label-position="top">
-            <el-form-item label="视频描述 (英文 prompt 效果更佳)">
-              <el-input v-model="forms.video.prompt" type="textarea" :rows="3"
-                       placeholder="例如：A drone shot flying over a beautiful mountain valley at sunset" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="genVideo" :loading="loading.video" :disabled="!forms.video.prompt">
-                生成视频
-              </el-button>
-            </el-form-item>
-            <el-form-item v-if="results.video" label="任务状态">
-              <div class="result-box">
-                <p>任务 ID: <code>{{ results.video.job_id }}</code></p>
-                <p>状态: <el-tag>{{ results.video.status }}</el-tag></p>
-                <el-button size="small" @click="checkVideoStatus" :disabled="!results.video.job_id">
-                  刷新状态
+              <div class="image-form-row two-col">
+                <el-form-item label="画幅">
+                  <el-select v-model="forms.image.ratio">
+                    <el-option label="1:1 主图" value="1:1" />
+                    <el-option label="16:9 横版" value="16:9" />
+                    <el-option label="9:16 竖版" value="9:16" />
+                    <el-option label="4:3" value="4:3" />
+                    <el-option label="3:4" value="3:4" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="数量">
+                  <el-select v-model="forms.image.n">
+                    <el-option :value="1" label="1 张" />
+                    <el-option :value="2" label="2 张" />
+                    <el-option :value="4" label="4 张" />
+                  </el-select>
+                </el-form-item>
+              </div>
+
+              <el-form-item>
+                <el-button class="gen-btn" :loading="loading.image" :disabled="!forms.image.prompt" @click="genImage">
+                  {{ loading.image ? '生成中…' : '生成图片' }}
                 </el-button>
-                <video v-if="results.video.video_url" :src="results.video.video_url" controls class="generated-video"></video>
+                <span class="cost-hint">预计 8-15 秒 · 当前真实模型</span>
+              </el-form-item>
+            </el-form>
+
+            <div v-if="imageHistory.length === 0 && !loading.image" class="empty-state">
+              <div class="empty-glyph">
+                <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="6" y="6" width="20" height="20" rx="3" />
+                  <circle cx="12" cy="12" r="2" />
+                  <path d="M6 19l5-5 4 4 3-3 8 8" stroke-linejoin="round" />
+                </svg>
               </div>
+              <h4>还没有生成记录</h4>
+              <p>输入提示词试试看。已配置真实 API，图片会真实生成。</p>
+            </div>
+          </div>
+
+          <div v-if="imageHistory.length > 0" class="history-section">
+            <div class="history-head">
+              <h3>最近生成</h3>
+              <span class="meta">共 {{ imageHistory.length }} 张 · {{ lastMockCount > 0 ? `${lastMockCount} 张为 mock` : '全部为真实生成' }}</span>
+            </div>
+            <div class="image-grid">
+              <article v-for="img in imageHistory" :key="img.id" class="image-tile">
+                <div class="thumb">
+                  <img :src="img.image_url" :alt="img.prompt" loading="lazy" @error="onImgError" />
+                  <span v-if="img.is_mock" class="mock-badge" title="mock 占位图">MOCK</span>
+                  <span v-else class="real-badge" title="真实生成">REAL</span>
+                </div>
+                <div class="tile-meta">
+                  <p class="prompt" :title="img.prompt">{{ img.prompt }}</p>
+                  <div class="row">
+                    <span>{{ img.ratio }} · {{ img.style }}</span>
+                    <span class="ts">{{ formatTime(img.created_at) }}</span>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <!-- 视频生成 -->
+      <el-tab-pane name="video">
+        <template #label>
+          <span class="tab-label">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="10" height="8" rx="1.5" /><path d="M6 6l4 2-4 2z" /></svg>
+            <span>视频生成</span>
+          </span>
+        </template>
+        <section class="ds-card ai-tab-card">
+          <h2 class="ds-card__title">文字转视频</h2>
+          <p class="ds-card__lede">MiniMax-Video 模型（每日 3 次额度）。</p>
+          <el-form :model="forms.video" label-position="top">
+            <el-form-item label="视频描述">
+              <el-input v-model="forms.video.prompt" type="textarea" :rows="3"
+                       placeholder="例如：航拍镜头飞越山谷日落" />
             </el-form-item>
+            <el-form-item>
+              <el-button class="primary-cta" :loading="loading.video" :disabled="!forms.video.prompt" @click="genVideo">
+                {{ loading.video ? '提交中…' : '生成视频' }}
+              </el-button>
+            </el-form-item>
+            <div v-if="results.video" class="result-block">
+              <p class="mono">任务 ID: {{ results.video.job_id }}</p>
+              <p>状态: <span class="ds-pill ds-pill--warning">{{ results.video.status }}</span></p>
+              <el-button size="small" :disabled="!results.video.job_id" @click="checkVideoStatus">刷新状态</el-button>
+              <video v-if="results.video.video_url" :src="results.video.video_url" controls class="generated-video"></video>
+            </div>
           </el-form>
-        </el-tab-pane>
-      </el-tabs>
-    </el-card>
+        </section>
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
@@ -169,32 +278,33 @@ import { settingsApi } from '@/api/settings'
 import { PLATFORM_OPTIONS, getPlatformName } from '@/constants'
 
 const activeTab = ref('summary')
-const loading = reactive({
-  summary: false,
-  podcast: false,
-  copy: false,
-  videoScript: false,
-  image: false,
-  video: false,
-})
-
+const loading = reactive({ summary: false, podcast: false, copy: false, videoScript: false, image: false, video: false })
 const forms = reactive({
   summary: { content: '' },
   podcast: { content: '', style: 'casual' },
   copy: { topic: '', platform: 'douyin' },
   videoScript: { topic: '', duration: 60 },
-  image: { prompt: '' },
+  image: { prompt: '', style: '写实摄影', ratio: '1:1', n: 1 },
   video: { prompt: '' },
 })
-
 const results = reactive<any>({})
+const imageHistory = ref<any[]>([])
+const lastMockCount = ref(0)
+
+const formatTime = (iso: string) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60_000) return '刚刚'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
+  return d.toLocaleDateString('zh-CN')
+}
 
 const checkConfigured = async () => {
   try {
     const s = await settingsApi.get()
-    if (!s.configured) {
-      ElMessage.warning('请先在设置中配置 API Key')
-    }
+    if (!s.configured) ElMessage.warning('请先在设置中配置 API Key')
   } catch (e) {}
 }
 
@@ -206,7 +316,7 @@ const onImgError = (e: Event) => {
 const handleError = (e: any, op: string) => {
   const msg = e.normalizedMessage || e.message || '生成失败'
   if (msg.includes('API Key') || msg.includes('api_key') || msg.includes('未配置')) {
-    ElMessage.error(`❌ AI 服务未配置：请先在"设置"页面配置 API Key`)
+    ElMessage.error(`AI 服务未配置：请先在设置页面配置 API Key`)
   } else {
     ElMessage.error(`${op} 失败: ${msg}`)
   }
@@ -214,40 +324,47 @@ const handleError = (e: any, op: string) => {
 
 const genSummary = async () => {
   loading.summary = true
-  try {
-    results.summary = await aiApi.summary(forms.summary.content)
-  } catch (e: any) { handleError(e, '摘要生成') }
+  try { results.summary = await aiApi.summary(forms.summary.content) }
+  catch (e: any) { handleError(e, '摘要生成') }
   finally { loading.summary = false }
 }
 
 const genPodcast = async () => {
   loading.podcast = true
-  try {
-    results.podcast = await aiApi.podcastScript(forms.podcast.content, forms.podcast.style)
-  } catch (e: any) { handleError(e, '播客脚本生成') }
+  try { results.podcast = await aiApi.podcastScript(forms.podcast.content, forms.podcast.style) }
+  catch (e: any) { handleError(e, '播客脚本生成') }
   finally { loading.podcast = false }
 }
 
 const genCopy = async () => {
   loading.copy = true
-  try {
-    results.copy = await aiApi.copy(forms.copy.topic, forms.copy.platform)
-  } catch (e: any) { handleError(e, '文案生成') }
+  try { results.copy = await aiApi.copy(forms.copy.topic, forms.copy.platform) }
+  catch (e: any) { handleError(e, '文案生成') }
   finally { loading.copy = false }
 }
 
 const genVideoScript = async () => {
   loading.videoScript = true
-  try {
-    results.videoScript = await aiApi.videoScript(forms.videoScript.topic, forms.videoScript.duration)
-  } catch (e: any) { handleError(e, '视频脚本生成') }
+  try { results.videoScript = await aiApi.videoScript(forms.videoScript.topic, forms.videoScript.duration) }
+  catch (e: any) { handleError(e, '视频脚本生成') }
   finally { loading.videoScript = false }
 }
 
 const genImage = async () => {
   loading.image = true
   try {
-    results.image = await aiApi.image(forms.image.prompt)
+    const resp = await aiApi.image({
+      prompt: forms.image.prompt, style: forms.image.style,
+      ratio: forms.image.ratio, n: forms.image.n,
+    })
+    results.image = resp
+    lastMockCount.value = resp.is_mock ? resp.count : 0
+    try {
+      const list = await aiApi.imageList(50)
+      imageHistory.value = list.items || []
+    } catch (_) {}
+    if (resp.is_mock) ElMessage.warning(`已用 mock 模式生成 ${resp.count} 张：${resp.error || 'API key 未配置'}`)
+    else ElMessage.success(`已生成 ${resp.count} 张图片`)
   } catch (e: any) { handleError(e, '图像生成') }
   finally { loading.image = false }
 }
@@ -256,10 +373,7 @@ const genVideo = async () => {
   loading.video = true
   try {
     results.video = await aiApi.videoGenerate(forms.video.prompt)
-    if (results.video?.job_id) {
-      // 启动轮询
-      pollVideoStatus(results.video.job_id)
-    }
+    if (results.video?.job_id) ElMessage.success(`任务已提交：${results.video.job_id}`)
   } catch (e: any) { handleError(e, '视频生成') }
   finally { loading.video = false }
 }
@@ -269,60 +383,138 @@ const checkVideoStatus = async () => {
   try {
     const status = await aiApi.videoStatus(results.video.job_id)
     results.video = { ...results.video, ...status }
-    if (status.status === 'completed' || status.status === 'failed') {
-      ElMessage.success(status.status === 'completed' ? '视频生成完成' : '视频生成失败')
-    }
+    if (status.video_url) ElMessage.success('视频生成完成')
   } catch (e: any) { handleError(e, '查询视频状态') }
 }
 
-const pollVideoStatus = (jobId: string) => {
-  let attempts = 0
-  const maxAttempts = 30
-  const timer = setInterval(async () => {
-    attempts++
-    try {
-      const status = await aiApi.videoStatus(jobId)
-      results.video = { ...results.video, ...status }
-      if (status.status === 'completed' || status.status === 'failed' || attempts >= maxAttempts) {
-        clearInterval(timer)
-        if (status.status === 'completed') {
-          ElMessage.success('视频生成完成')
-        } else if (status.status === 'failed') {
-          ElMessage.error('视频生成失败')
-        } else if (attempts >= maxAttempts) {
-          ElMessage.warning('视频生成超时，请手动刷新')
-        }
-      }
-    } catch (e) {
-      clearInterval(timer)
-    }
-  }, 5000)
-}
-
-onMounted(checkConfigured)
+onMounted(async () => {
+  checkConfigured()
+  try {
+    const list = await aiApi.imageList(50)
+    imageHistory.value = list.items || []
+  } catch (_) {}
+})
 </script>
 
 <style scoped>
-.ai-page { padding: 0; }
-.ai-card {
-  background: rgba(26, 26, 46, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.ds-tabs { margin-top: 24px; }
+.tab-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 14px;
+}
+.tab-label svg { color: var(--claude-terracotta); }
+
+.ai-tab-card { max-width: 920px; margin-top: 8px; }
+.primary-cta {
+  background: var(--claude-terracotta) !important;
+  border: 0 !important; color: var(--claude-ivory) !important;
+  border-radius: 12px !important;
+  height: 40px !important; padding: 0 22px !important;
+  font-weight: 500 !important;
+}
+.primary-cta:hover { background: var(--claude-coral) !important; }
+
+.result-block {
+  background: var(--claude-parchment);
+  border: 1px solid var(--claude-border-warm);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-top: 8px;
+}
+.result-text {
+  font-family: var(--font-serif);
+  font-size: 16px; line-height: 1.75;
+  color: var(--claude-ink);
+  white-space: pre-wrap;
+}
+.result-meta {
+  font-size: 12px; color: var(--claude-stone);
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--claude-border-cream);
+  font-variant-numeric: tabular-nums;
+}
+.generated-video { max-width: 100%; border-radius: var(--radius-lg); margin-top: 12px; }
+
+.image-gen-wrap { padding: 0; }
+.image-gen-card {
+  background: var(--claude-ivory);
+  border: 1px solid var(--claude-border-cream);
   border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 32px;
 }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.card-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: #fff; }
-.ai-tabs :deep(.el-tabs__nav-wrap)::after { background: rgba(255, 255, 255, 0.08); }
-.ai-tabs :deep(.el-tabs__item) { color: #a0a0b0; }
-.ai-tabs :deep(.el-tabs__item.is-active) { color: #00d4ff; }
-.result-box {
-  background: rgba(0, 212, 255, 0.05);
-  border: 1px solid rgba(0, 212, 255, 0.2);
-  border-radius: 12px;
-  padding: 16px;
+.image-gen-card .card-title {
+  font-family: var(--font-serif); font-size: 28px; font-weight: 500;
+  color: var(--claude-ink); margin: 0 0 6px;
 }
-.result-text { font-size: 14px; line-height: 1.8; color: #e0e0e0; white-space: pre-wrap; }
-.result-meta { font-size: 12px; color: #888; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.05); }
-.generated-image { max-width: 100%; border-radius: 8px; margin-top: 8px; }
-.generated-video { max-width: 100%; border-radius: 8px; margin-top: 12px; }
-code { background: rgba(0, 0, 0, 0.3); padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+.image-gen-card .card-lede { font-size: 14px; color: var(--claude-olive); margin: 0 0 24px; }
+.image-form :deep(.el-form-item__label) { color: var(--claude-ink); font-weight: 500; font-size: 13px; }
+.image-form :deep(.el-textarea__inner),
+.image-form :deep(.el-input__wrapper) {
+  background: var(--claude-ivory); border-radius: 12px;
+  border: 1px solid var(--claude-border-warm); box-shadow: none;
+}
+.image-form :deep(.el-textarea__inner:focus),
+.image-form :deep(.el-input__wrapper.is-focus) {
+  border-color: var(--claude-focus-blue); box-shadow: 0 0 0 3px rgba(56,152,236,0.15);
+}
+.image-form-row { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.image-form-row.two-col { grid-template-columns: 1fr 1fr; }
+@media (max-width: 640px) { .image-form-row.two-col { grid-template-columns: 1fr; } }
+.gen-btn {
+  background: var(--claude-terracotta) !important; border: 0 !important; color: var(--claude-ivory) !important;
+  border-radius: 12px !important; padding: 10px 24px !important;
+  font-weight: 500 !important; font-size: 15px !important;
+}
+.gen-btn:hover { background: var(--claude-coral) !important; }
+.cost-hint { margin-left: 14px; font-size: 12px; color: var(--claude-stone); }
+
+.empty-state { text-align: center; padding: 56px 24px 16px; color: var(--claude-stone); }
+.empty-glyph {
+  width: 56px; height: 56px; margin: 0 auto 16px;
+  border: 1.5px dashed #e8e6dc; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--claude-stone);
+}
+.empty-state h4 { font-family: Georgia, serif; font-size: 19px; font-weight: 500; color: var(--claude-ink); margin: 0 0 6px; }
+.empty-state p { font-size: 13px; line-height: 1.6; margin: 0; max-width: 420px; margin-left: auto; margin-right: auto; }
+
+.history-section { margin-top: 8px; }
+.history-head {
+  display: flex; align-items: end; justify-content: space-between;
+  padding-bottom: 12px; border-bottom: 1px solid var(--claude-border-cream); margin-bottom: 20px;
+}
+.history-head h3 { font-family: Georgia, serif; font-size: 22px; font-weight: 500; margin: 0; color: var(--claude-ink); }
+.history-head .meta { font-size: 12px; color: var(--claude-stone); }
+.image-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.image-tile {
+  background: var(--claude-ivory); border: 1px solid var(--claude-border-cream);
+  border-radius: 12px; overflow: hidden;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.image-tile:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.05); }
+.image-tile .thumb {
+  position: relative; aspect-ratio: 1 / 1;
+  background: linear-gradient(135deg, #e8e6dc, #d1cfc5);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.image-tile .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mock-badge, .real-badge {
+  position: absolute; top: 8px; left: 8px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  padding: 3px 8px; border-radius: 9999px;
+  color: #faf9f5;
+}
+.mock-badge { background: rgba(20, 20, 19, 0.78); }
+.real-badge { background: rgba(201, 100, 66, 0.92); }
+.image-tile .tile-meta { padding: 12px 14px; }
+.image-tile .prompt {
+  font-size: 13px; line-height: 1.4; color: var(--claude-ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; margin: 0 0 6px; min-height: 36px;
+}
+.image-tile .row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; color: var(--claude-stone); font-variant-numeric: tabular-nums;
+}
 </style>

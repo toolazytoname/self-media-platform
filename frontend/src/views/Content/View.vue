@@ -1,48 +1,71 @@
 <template>
-  <div class="view-page">
-    <el-card class="view-card" v-loading="loading">
-      <template #header>
-        <div class="card-header">
-          <el-button text @click="$router.push('/content')" class="back-btn">← 返回列表</el-button>
-          <span class="title">内容详情</span>
-          <div v-if="content" class="header-actions">
-            <el-tag :type="(getStatusMeta(CONTENT_STATUSES, content.status).tagType) as any">
+  <div v-if="content">
+    <header class="page-header view-header">
+      <div class="breadcrumb">
+        <router-link to="/content">内容</router-link>
+        <span>·</span>
+        <span>详情</span>
+      </div>
+
+      <div class="header-row">
+        <div class="title-block">
+          <h1 class="page-title">{{ content.title }}</h1>
+          <div class="page-subtitle meta-row">
+            <span class="ds-pill ds-pill--neutral">{{ getPlatformName(content.platform) }}</span>
+            <span class="ds-status" :class="statusClass(content.status)">
+              <span class="dot"></span>
               {{ getStatusMeta(CONTENT_STATUSES, content.status).label }}
-            </el-tag>
-            <el-button type="primary" size="small" @click="goEdit">✏️ 编辑</el-button>
-            <el-button size="small" @click="onDuplicate">📋 复制</el-button>
-            <el-button size="small" type="danger" @click="onDelete">🗑 删除</el-button>
+            </span>
           </div>
         </div>
-      </template>
-
-      <div v-if="content" class="content-detail">
-        <h1 class="detail-title">{{ content.title }}</h1>
-
-        <div class="detail-meta">
-          <span class="meta-item">
-            <span class="meta-label">平台：</span>
-            <span class="meta-value">{{ getPlatformName(content.platform) }}</span>
-          </span>
-          <span class="meta-item">
-            <span class="meta-label">创建：</span>
-            <span class="meta-value">{{ formatDate(content.created_at) }}</span>
-          </span>
-          <span class="meta-item">
-            <span class="meta-label">更新：</span>
-            <span class="meta-value">{{ formatDate(content.updated_at) }}</span>
-          </span>
+        <div class="header-actions">
+          <el-button @click="$router.push('/content')">返回</el-button>
+          <el-button @click="onDuplicate">复制</el-button>
+          <el-button type="primary" @click="goEdit">编辑</el-button>
+          <el-button type="danger" text @click="onDelete">删除</el-button>
         </div>
-
-        <div v-if="content.tags && content.tags.length" class="detail-tags">
-          <el-tag v-for="t in content.tags" :key="t" size="small" class="tag">#{{ t }}</el-tag>
-        </div>
-
-        <el-divider />
-
-        <div class="markdown-body" v-html="renderedBody"></div>
       </div>
-    </el-card>
+    </header>
+
+    <section class="ds-card view-card" v-loading="loading">
+      <div class="meta-grid">
+        <div>
+          <div class="caption">创建</div>
+          <div class="meta-value">{{ formatDate(content.created_at) }}</div>
+        </div>
+        <div>
+          <div class="caption">更新</div>
+          <div class="meta-value">{{ formatDate(content.updated_at) }}</div>
+        </div>
+        <div>
+          <div class="caption">状态</div>
+          <div class="meta-value">{{ getStatusMeta(CONTENT_STATUSES, content.status).label }}</div>
+        </div>
+        <div>
+          <div class="caption">平台</div>
+          <div class="meta-value">{{ getPlatformName(content.platform) }}</div>
+        </div>
+      </div>
+
+      <div v-if="content.tags && content.tags.length" class="tags-row">
+        <span v-for="t in content.tags" :key="t" class="ds-pill ds-pill--neutral">#{{ t }}</span>
+      </div>
+
+      <el-divider />
+
+      <article class="markdown-body" v-html="renderedBody"></article>
+    </section>
+  </div>
+  <div v-else-if="!loading" class="ds-empty">
+    <div class="glyph">
+      <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="16" cy="16" r="12" />
+        <path d="M12 12l8 8M20 12l-8 8" stroke-linecap="round" />
+      </svg>
+    </div>
+    <h4>内容不存在</h4>
+    <p>这条内容可能已被删除，或链接已失效。</p>
+    <el-button @click="$router.push('/content')">返回列表</el-button>
   </div>
 </template>
 
@@ -60,240 +83,95 @@ const router = useRouter()
 const content = ref<Content | null>(null)
 const loading = ref(false)
 
-const renderedBody = computed(() => {
-  if (!content.value?.body) return '*(空内容)*'
-  return marked.parse(content.value.body, { async: false }) as string
-})
+const renderedBody = computed(() => marked.parse(content.value?.body || '*(空)*', { async: false }) as string)
+
+const statusClass = (s: string) => {
+  if (s === 'published' || s === 'completed') return 'ds-status--success'
+  if (s === 'pending') return 'ds-status--warning'
+  if (s === 'failed' || s === 'archived') return 'ds-status--error'
+  return 'ds-status--neutral'
+}
 
 const load = async (id: string) => {
   loading.value = true
-  try {
-    content.value = await contentApi.get(id)
-  } catch (e: any) {
-    ElMessage.error('加载失败: ' + (e.normalizedMessage || e.message))
-    router.push('/content')
-  } finally {
-    loading.value = false
-  }
+  try { content.value = await contentApi.get(id) }
+  catch (e: any) { ElMessage.error('加载失败: ' + e.normalizedMessage) }
+  finally { loading.value = false }
 }
 
-const goEdit = () => {
-  if (content.value) {
-    router.push(`/content/edit/${content.value.id}`)
-  }
-}
+const goEdit = () => content.value && router.push(`/content/edit/${content.value.id}`)
 
 const onDuplicate = async () => {
   if (!content.value) return
   try {
     const newItem = await contentApi.duplicate(content.value.id)
-    ElMessage.success('已复制为草稿：' + newItem.id)
+    ElMessage.success('已复制为草稿')
     router.push(`/content/edit/${newItem.id}`)
-  } catch (e: any) {
-    ElMessage.error('复制失败: ' + (e.normalizedMessage || e.message))
-  }
+  } catch (e: any) { ElMessage.error('复制失败: ' + (e.normalizedMessage || e.message)) }
 }
 
 const onDelete = async () => {
   if (!content.value) return
   try {
-    await ElMessageBox.confirm(
-      `确定要删除「${content.value.title}」吗？`,
-      '删除确认',
-      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
-    )
+    await ElMessageBox.confirm(`确定要删除「${content.value.title}」吗？`, '删除确认', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning',
+    })
   } catch { return }
   try {
     await contentApi.delete(content.value.id)
     ElMessage.success('删除成功')
     router.push('/content')
-  } catch (e: any) {
-    ElMessage.error('删除失败: ' + (e.normalizedMessage || e.message))
-  }
+  } catch (e: any) { ElMessage.error('删除失败: ' + (e.normalizedMessage || e.message)) }
 }
 
 onMounted(() => load(route.params.id as string))
 </script>
 
 <style scoped>
-.view-page {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.view-card {
-  background: rgba(26, 26, 46, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.back-btn {
-  color: #00d4ff;
-}
-
-.title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #fff;
-  flex: 1;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.content-detail {
-  padding: 8px 0;
-}
-
-.detail-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1.3;
-  margin-bottom: 16px;
-}
-
-.detail-meta {
-  display: flex;
+.view-card { max-width: 900px; }
+.header-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
   flex-wrap: wrap;
-  gap: 16px;
-  font-size: 13px;
-  color: #888;
-  margin-bottom: 12px;
 }
-
-.meta-label {
-  color: #666;
+.title-block { flex: 1; min-width: 0; }
+.meta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.meta-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  margin-bottom: 20px;
 }
-
-.meta-value {
-  color: #a0a0b0;
-}
-
-.detail-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.tag {
-  background: rgba(0, 212, 255, 0.1);
-  border: none;
-  color: #00d4ff;
-}
-
-/* Markdown 渲染样式 */
+.meta-grid > div { display: flex; flex-direction: column; gap: 4px; }
+.meta-value { font-size: 14px; color: var(--claude-ink); font-variant-numeric: tabular-nums; }
+.tags-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .markdown-body {
-  color: #e0e0e0;
-  line-height: 1.8;
-  font-size: 15px;
+  font-family: var(--font-serif); font-size: 17px; line-height: 1.85;
+  color: var(--claude-ink);
 }
-
-.markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3),
-.markdown-body :deep(h4), .markdown-body :deep(h5), .markdown-body :deep(h6) {
-  color: #00d4ff;
-  margin-top: 24px;
-  margin-bottom: 12px;
-  line-height: 1.3;
+.markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3) {
+  font-family: var(--font-serif); font-weight: 500;
+  color: var(--claude-ink); margin: 32px 0 12px;
+  letter-spacing: -0.01em;
 }
-
-.markdown-body :deep(h1) { font-size: 28px; }
+.markdown-body :deep(h1) { font-size: 32px; }
 .markdown-body :deep(h2) { font-size: 24px; }
 .markdown-body :deep(h3) { font-size: 20px; }
-.markdown-body :deep(h4) { font-size: 18px; }
-
-.markdown-body :deep(p) {
-  margin: 12px 0;
-  white-space: pre-wrap;
-}
-
+.markdown-body :deep(p) { margin: 0 0 16px; }
+.markdown-body :deep(a) { color: var(--claude-terracotta); }
 .markdown-body :deep(code) {
-  background: rgba(0, 0, 0, 0.4);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
-  color: #ff9f43;
+  font-family: var(--font-mono); font-size: 0.9em;
+  background: var(--claude-border-cream); padding: 2px 6px; border-radius: 4px;
 }
-
 .markdown-body :deep(pre) {
-  background: rgba(0, 0, 0, 0.4);
-  padding: 16px;
-  border-radius: 8px;
-  overflow-x: auto;
-  margin: 16px 0;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--claude-ink); color: var(--claude-ivory);
+  padding: 16px; border-radius: var(--radius-lg); overflow-x: auto;
+  font-family: var(--font-mono); font-size: 13px;
 }
-
-.markdown-body :deep(pre code) {
-  background: transparent;
-  padding: 0;
-  color: #e0e0e0;
-}
-
-.markdown-body :deep(ul), .markdown-body :deep(ol) {
-  padding-left: 28px;
-  margin: 12px 0;
-}
-
-.markdown-body :deep(li) {
-  margin: 6px 0;
-}
-
 .markdown-body :deep(blockquote) {
-  border-left: 4px solid #00d4ff;
-  padding: 8px 12px 8px 16px;
-  color: #a0a0b0;
-  margin: 16px 0;
-  background: rgba(0, 212, 255, 0.05);
-  border-radius: 0 6px 6px 0;
+  border-left: 3px solid var(--claude-terracotta);
+  padding: 4px 0 4px 16px; margin: 16px 0;
+  color: var(--claude-olive);
+  font-style: italic;
 }
-
-.markdown-body :deep(a) {
-  color: #00d4ff;
-  text-decoration: none;
-}
-
-.markdown-body :deep(a:hover) {
-  text-decoration: underline;
-}
-
-.markdown-body :deep(table) {
-  border-collapse: collapse;
-  margin: 16px 0;
-  width: 100%;
-}
-
-.markdown-body :deep(th), .markdown-body :deep(td) {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 10px 14px;
-}
-
-.markdown-body :deep(th) {
-  background: rgba(0, 212, 255, 0.05);
-  color: #00d4ff;
-}
-
-.markdown-body :deep(img) {
-  max-width: 100%;
-  border-radius: 8px;
-  margin: 12px 0;
-}
-
-.markdown-body :deep(hr) {
-  border: none;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 24px 0;
+@media (max-width: 640px) {
+  .meta-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

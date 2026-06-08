@@ -1,0 +1,308 @@
+/* =================================================================
+   Element Plus Theme Overrides — Apple + Claude
+   Override EL's CSS variables so every component picks up tokens
+   ================================================================= */
+
+:root {
+  /* Brand colors */
+  --el-color-primary: var(--claude-terracotta);
+  --el-color-primary-light-3: #d28161;
+  --el-color-primary-light-5: #db9b81;
+  --el-color-primary-light-7: #e4b6a2;
+  --el-color-primary-light-8: #ebc7b8;
+  --el-color-primary-light-9: #f3d9ce;
+  --el-color-primary-dark-2: #a04d31;
+  --el-color-success: var(--claude-success);
+  --el-color-warning: var(--claude-coral);
+  --el-color-danger: var(--claude-error);
+  --el-color-error: var(--claude-error);
+  --el-color-info: var(--claude-olive);
+
+  /* Surfaces — Claude parchment + ivory */
+  --el-bg-color: var(--claude-ivory);
+  --el-bg-color-page: var(--claude-parchment);
+  --el-bg-color-overlay: #ffffff;
+
+  /* Text */
+  --el-text-color-primary: var(--claude-ink);
+  --el-text-color-regular: var(--claude-ink);
+  --el-text-color-secondary: var(--claude-olive);
+  --el-text-color-placeholder: var(--claude-stone);
+  --el-text-color-disabled: var(--claude-stone);
+
+  /* Borders */
+  --el-border-color: var(--claude-border-warm);
+  --el-border-color-light: var(--claude-border-cream);
+  --el-border-color-lighter: #f5f4ed;
+  --el-border-color-extra-light: #faf9f5;
+  --el-border-color-dark: var(--claude-ring-warm);
+  --el-border-color-darker: var(--claude-ring-warm);
+  --el-border-color-hover: var(--claude-terracotta);
+
+  /* Fill (background variants) */
+  --el-fill-color: var(--claude-parchment);
+  --el-fill-color-light: #faf9f5;
+  --el-fill-color-lighter: #faf9f5;
+  --el-fill-color-extra-light: #ffffff;
+  --el-fill-color-dark: #e8e6dc;
+  --el-fill-color-darker: #d1cfc5;
+  --el-fill-color-blank: #ffffff;
+
+  /* Mask */
+  --el-mask-color: rgba(20, 20, 19, 0.5);
+  --el-mask-color-extra-light: rgba(20, 20, 19, 0.1);
+
+  /* Typography */
+  --el-font-family: var(--font-sans);
+
+  /* Radii */
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+  --el-border-radius-round: 9999px;
+  --el-border-radius-circle: 50%;
+
+  /* Spacing */
+  --el-spacing-base: 8px;
+}
+
+/* ========== Card ========== */
+.el-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  color: var(--text-primary);
+}
+.el-card__header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.el-card__body { padding: 24px; }
+
+/* ========== Button — terracotta primary, warm sand secondary ========== */
+.el-button {
+  border-radius: var(--radius-lg);
+  font-weight: 500;
+  border-color: var(--border-medium);
+  background: var(--bg-card-elevated);
+  color: var(--text-primary);
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+}
+.el-button:hover { color: var(--claude-terracotta); border-color: var(--claude-ring-warm); }
+.el-button:active { transform: scale(0.98); }
+.el-button--primary {
+  background: var(--cta-primary-bg);
+  color: var(--cta-primary-text);
+  border-color: var(--cta-primary-bg);
+}
+.el-button--primary:hover {
+  background: var(--cta-primary-hover);
+  color: var(--cta-primary-text);
+  border-color: var(--cta-primary-hover);
+}
+.el-button--success {
+  background: var(--claude-success);
+  color: var(--claude-ivory);
+  border-color: var(--claude-success);
+}
+.el-button--warning {
+  background: var(--claude-coral);
+  color: var(--claude-ivory);
+  border-color: var(--claude-coral);
+}
+.el-button--danger {
+  background: var(--cta-danger-bg);
+  color: var(--cta-danger-text);
+  border-color: var(--cta-danger-bg);
+}
+.el-button--text {
+  background: transparent; border-color: transparent; color: var(--claude-olive);
+}
+.el-button--text:hover { color: var(--claude-ink); background: transparent; border-color: transparent; }
+.el-button.is-link { color: var(--claude-terracotta); }
+
+/* ========== Input ========== */
+.el-input__wrapper {
+  background: var(--claude-ivory);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px var(--claude-border-warm);
+  transition: box-shadow 0.15s;
+}
+.el-input__wrapper:hover { box-shadow: 0 0 0 1px var(--claude-ring-warm); }
+.el-input__wrapper.is-focus { box-shadow: 0 0 0 1px var(--claude-focus-blue), 0 0 0 3px rgba(56,152,236,0.15); }
+.el-input__inner { color: var(--claude-ink); }
+.el-input__inner::placeholder { color: var(--claude-stone); }
+
+.el-textarea__inner {
+  background: var(--claude-ivory);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px var(--claude-border-warm);
+  color: var(--claude-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.el-textarea__inner:hover { box-shadow: 0 0 0 1px var(--claude-ring-warm); }
+.el-textarea__inner:focus { box-shadow: 0 0 0 1px var(--claude-focus-blue), 0 0 0 3px rgba(56,152,236,0.15); }
+.el-textarea__inner::placeholder { color: var(--claude-stone); }
+
+.el-select__wrapper {
+  background: var(--claude-ivory);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px var(--claude-border-warm);
+}
+.el-select__wrapper.is-hovering { box-shadow: 0 0 0 1px var(--claude-ring-warm); }
+.el-select__wrapper.is-focused { box-shadow: 0 0 0 1px var(--claude-focus-blue), 0 0 0 3px rgba(56,152,236,0.15); }
+
+/* ========== Table ========== */
+.el-table {
+  background: transparent;
+  color: var(--text-primary);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: var(--claude-border-cream);
+  --el-table-row-hover-bg-color: var(--claude-parchment);
+  --el-table-border-color: var(--claude-border-cream);
+}
+.el-table th.el-table__cell {
+  background: var(--claude-border-cream);
+  color: var(--claude-ink);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--claude-border-warm);
+}
+.el-table td.el-table__cell {
+  background: transparent;
+  color: var(--claude-ink);
+  border-bottom: 1px solid var(--claude-border-cream);
+}
+.el-table tr:hover > td.el-table__cell { background: var(--claude-parchment); }
+.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell { background: var(--claude-parchment); }
+.el-table .el-table__empty-block { background: transparent; min-height: 200px; }
+.el-table .el-table__empty-text { color: var(--claude-stone); font-family: var(--font-serif); }
+
+/* ========== Tag ========== */
+.el-tag {
+  border-radius: var(--radius-pill);
+  padding: 0 10px;
+  height: 22px;
+  line-height: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--claude-border-cream);
+  color: var(--claude-olive);
+  border: 1px solid transparent;
+}
+.el-tag.el-tag--primary { background: rgba(201, 100, 66, 0.10); color: var(--claude-terracotta); border-color: rgba(201, 100, 66, 0.20); }
+.el-tag.el-tag--success { background: rgba(16, 185, 129, 0.10); color: #0a7d5d; border-color: rgba(16, 185, 129, 0.20); }
+.el-tag.el-tag--warning { background: rgba(217, 119, 87, 0.12); color: #b85a35; border-color: rgba(217, 119, 87, 0.20); }
+.el-tag.el-tag--danger { background: rgba(181, 51, 51, 0.10); color: var(--claude-error); border-color: rgba(181, 51, 51, 0.20); }
+.el-tag.el-tag--info { background: var(--claude-border-warm); color: var(--claude-olive); border-color: transparent; }
+.el-tag.is-hit { border-color: var(--claude-ring-warm); }
+
+/* ========== Dialog ========== */
+.el-overlay {
+  background-color: rgba(20, 20, 19, 0.4);
+  backdrop-filter: blur(2px);
+}
+.el-dialog {
+  background: var(--claude-ivory);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--claude-border-warm);
+  box-shadow: 0 20px 60px rgba(20, 20, 19, 0.18);
+}
+.el-dialog__title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  color: var(--claude-ink);
+  font-size: 22px;
+}
+.el-dialog__header { padding: 24px 24px 16px; }
+.el-dialog__body { padding: 0 24px 16px; color: var(--claude-ink); }
+.el-dialog__footer { padding: 12px 24px 24px; }
+
+/* ========== Tabs ========== */
+.el-tabs__item {
+  color: var(--claude-olive);
+  font-weight: 500;
+  font-size: 14px;
+  padding: 0 16px;
+  height: 40px;
+  line-height: 40px;
+}
+.el-tabs__item.is-active { color: var(--claude-ink); }
+.el-tabs__active-bar { background-color: var(--claude-terracotta); height: 2px; }
+.el-tabs__nav-wrap::after { background-color: var(--claude-border-cream); }
+
+/* ========== Checkbox / Radio ========== */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: var(--claude-terracotta);
+  border-color: var(--claude-terracotta);
+}
+.el-checkbox__inner:hover { border-color: var(--claude-terracotta); }
+.el-radio__input.is-checked .el-radio__inner {
+  background-color: var(--claude-ivory);
+  border-color: var(--claude-terracotta);
+}
+.el-radio__input.is-checked .el-radio__inner::after { background-color: var(--claude-terracotta); }
+
+/* ========== Pagination ========== */
+.el-pagination {
+  --el-pagination-bg-color: transparent;
+  color: var(--claude-olive);
+}
+.el-pager li {
+  background: transparent; color: var(--claude-olive);
+  font-weight: 500;
+}
+.el-pager li.is-active {
+  background: var(--claude-terracotta); color: var(--claude-ivory);
+}
+.el-pager li:hover { color: var(--claude-terracotta); }
+
+/* ========== Dropdown ========== */
+.el-popper.is-light {
+  background: var(--claude-ivory);
+  border: 1px solid var(--claude-border-warm);
+  box-shadow: var(--shadow-whisper);
+}
+.el-select-dropdown__item { color: var(--claude-ink); }
+.el-select-dropdown__item.is-hovering, .el-select-dropdown__item:hover { background: var(--claude-border-cream); }
+.el-select-dropdown__item.is-selected { color: var(--claude-terracotta); font-weight: 500; }
+
+/* ========== Form ========== */
+.el-form-item__label { color: var(--claude-ink); font-weight: 500; font-size: 13px; }
+.el-form-item.is-required .el-form-item__label-wrap > .el-form-item__label::before { color: var(--claude-error); }
+
+/* ========== Divider ========== */
+.el-divider { border-color: var(--claude-border-cream); }
+.el-divider__text { color: var(--claude-stone); background: var(--claude-parchment); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+/* ========== Descriptions ========== */
+.el-descriptions {
+  --el-descriptions-border-color: var(--claude-border-cream);
+  --el-descriptions-item-bordered-label-bg: var(--claude-border-cream);
+  color: var(--claude-ink);
+}
+.el-descriptions__label { color: var(--claude-olive); font-weight: 500; font-size: 13px; }
+.el-descriptions__content { color: var(--claude-ink); }
+
+/* ========== Message / Notification ========== */
+.el-message {
+  background: var(--claude-ivory);
+  border: 1px solid var(--claude-border-warm);
+  color: var(--claude-ink);
+  box-shadow: var(--shadow-whisper);
+  border-radius: var(--radius-lg);
+}
+.el-message--success { background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.3); }
+.el-message--warning { background: rgba(217, 119, 87, 0.10); border-color: rgba(217, 119, 87, 0.3); }
+.el-message--error { background: rgba(181, 51, 51, 0.10); border-color: rgba(181, 51, 51, 0.3); }
+.el-message--info { background: var(--claude-border-cream); }
+
+/* ========== Loading ========== */
+.el-loading-mask { background-color: rgba(245, 244, 237, 0.85); }
+.el-loading-spinner .path { stroke: var(--claude-terracotta); }
+.el-loading-spinner .el-loading-text { color: var(--claude-ink); font-family: var(--font-serif); }

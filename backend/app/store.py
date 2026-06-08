@@ -28,6 +28,31 @@ class Store:
         self.scheduled_tasks: List[Dict[str, Any]] = []
         # 内容模板
         self.templates: List[Dict[str, Any]] = []
+        # AIGC 图片 (image gen)
+        self.images: List[Dict[str, Any]] = []
+
+    # ============ AIGC Images ============
+    def add_image(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        item["id"] = item.get("id") or f"img_{uuid.uuid4().hex[:10]}"
+        item.setdefault("created_at", datetime.now().isoformat())
+        self.images.append(item)
+        return item
+
+    def list_images(self, limit: int = 50) -> List[Dict[str, Any]]:
+        return list(reversed(self.images[-limit:]))
+
+    def get_image(self, image_id: str) -> Dict[str, Any] | None:
+        for i in self.images:
+            if i.get("id") == image_id:
+                return i
+        return None
+
+    def delete_image(self, image_id: str) -> bool:
+        for i, item in enumerate(self.images):
+            if item.get("id") == image_id:
+                self.images.pop(i)
+                return True
+        return False
 
     # ============ Users ============
     def add_user(self, item: Dict[str, Any]) -> Dict[str, Any]:

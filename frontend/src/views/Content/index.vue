@@ -1,101 +1,107 @@
 <template>
-  <div class="content-page">
-    <el-card class="content-card">
-      <template #header>
-        <div class="card-header">
-          <div class="card-title">
-            <span class="title-icon">📝</span>
-            <span>内容列表</span>
-            <el-tag v-if="total > 0" size="small" type="info" class="count-tag">{{ total }} 条</el-tag>
-          </div>
-          <div class="header-actions">
-            <el-button @click="onExport('json')">📥 导出 JSON</el-button>
-            <el-button @click="onExport('markdown')">📝 导出 MD</el-button>
-            <el-button @click="onExport('csv')">📊 导出 CSV</el-button>
-            <el-button type="primary" @click="$router.push('/content/create')">
-              + 新建内容
-            </el-button>
-          </div>
+  <div>
+    <!-- Page header (Claude editorial) -->
+    <header class="page-header">
+      <div class="breadcrumb">
+        <router-link to="/content">内容</router-link>
+        <span>·</span>
+        <span>列表</span>
+      </div>
+      <h1 class="page-title">内容管理</h1>
+      <p class="page-subtitle">管理你的选题、稿件和已发布内容。支持多平台、批量操作、状态流转。</p>
+
+      <div class="header-actions">
+        <el-button @click="onExport('json')">导出 JSON</el-button>
+        <el-button @click="onExport('markdown')">导出 Markdown</el-button>
+        <el-button @click="onExport('csv')">导出 CSV</el-button>
+        <el-button type="primary" @click="$router.push('/content/create')">
+          新建内容
+        </el-button>
+      </div>
+    </header>
+
+    <!-- Filter bar -->
+    <div class="ds-filter-bar">
+      <el-input v-model="searchKeyword" placeholder="搜索标题或正文..." class="grow" clearable
+                @keyup.enter="reload" @clear="reload" />
+      <el-select v-model="filterStatus" placeholder="状态" clearable @change="reload" style="width: 140px">
+        <el-option v-for="s in CONTENT_STATUSES" :key="s.value" :label="s.label" :value="s.value" />
+      </el-select>
+      <el-select v-model="filterPlatform" placeholder="平台" clearable @change="reload" style="width: 160px">
+        <el-option v-for="p in PLATFORM_OPTIONS" :key="p.value" :label="p.label" :value="p.value" />
+      </el-select>
+      <el-button @click="reload">刷新</el-button>
+      <div v-if="selectedIds.length > 0" class="ds-bulk-strip">
+        <span class="label">已选 {{ selectedIds.length }} 项</span>
+        <el-button size="small" @click="onBulkUpdateStatus('published')">批量发布</el-button>
+        <el-button size="small" @click="onBulkUpdateStatus('archived')">批量归档</el-button>
+        <el-button size="small" type="danger" @click="onBulkDelete">批量删除</el-button>
+        <el-button size="small" text @click="selectedIds = []">取消</el-button>
+      </div>
+    </div>
+
+    <!-- Loading / Empty / Grid -->
+    <div v-if="loading && contentList.length === 0" class="ds-loading">
+      <div class="spinner"></div>
+      <div>正在加载内容…</div>
+    </div>
+
+    <div v-else-if="contentList.length === 0" class="ds-empty">
+      <div class="glyph">
+        <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="6" y="6" width="20" height="20" rx="3" />
+          <path d="M11 12h10M11 16h10M11 20h6" stroke-linecap="round" />
+        </svg>
+      </div>
+      <h4>还没有内容</h4>
+      <p>从新建内容开始，或者从 AI 工具一键生成你的第一篇稿件。</p>
+      <el-button type="primary" @click="$router.push('/content/create')">新建内容</el-button>
+    </div>
+
+    <div v-else class="ds-card-grid">
+      <article v-for="item in contentList" :key="item.id" class="ds-item-card" :class="{ 'is-selected': selectedIds.includes(item.id) }">
+        <div class="head">
+          <h3 class="title" @click="goView(item.id)">{{ item.title }}</h3>
+          <el-checkbox v-model="selectedIds" :value="item.id" />
         </div>
-      </template>
 
-      <div class="filter-bar">
-        <el-input v-model="searchKeyword" placeholder="搜索标题/正文..." class="search-input" clearable
-                  @keyup.enter="reload" @clear="reload" />
-        <el-select v-model="filterStatus" placeholder="状态" clearable @change="reload" style="width: 130px">
-          <el-option v-for="s in CONTENT_STATUSES" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-        <el-select v-model="filterPlatform" placeholder="平台" clearable @change="reload" style="width: 140px">
-          <el-option v-for="p in PLATFORM_OPTIONS" :key="p.value" :label="p.label" :value="p.value" />
-        </el-select>
-        <el-button @click="reload">🔄 刷新</el-button>
-        <div class="bulk-actions" v-if="selectedIds.length > 0">
-          <span class="bulk-label">已选 {{ selectedIds.length }} 项</span>
-          <el-button size="small" @click="onBulkUpdateStatus('published')">批量发布</el-button>
-          <el-button size="small" @click="onBulkUpdateStatus('archived')">批量归档</el-button>
-          <el-button size="small" type="danger" @click="onBulkDelete">批量删除</el-button>
-          <el-button size="small" text @click="selectedIds = []">取消选择</el-button>
+        <div class="meta">
+          <span class="ds-pill ds-pill--neutral">{{ getPlatformName(item.platform) }}</span>
+          <span class="ds-status" :class="statusClass(item.status)">
+            <span class="dot"></span>
+            {{ getStatusMeta(CONTENT_STATUSES, item.status).label }}
+          </span>
+          <span style="margin-left: auto">{{ formatDate(item.updated_at) }}</span>
         </div>
-      </div>
 
-      <div v-if="loading && contentList.length === 0" class="loading-state">
-        <el-icon class="is-loading"><Loading /></el-icon>
-        <span>加载中...</span>
-      </div>
+        <p v-if="item.body" class="body">{{ truncate(item.body, 120) }}</p>
 
-      <div v-else-if="contentList.length === 0" class="empty-state">
-        <span>📝</span>
-        <p>暂无内容</p>
-        <p class="hint">点击上方按钮创建第一个内容</p>
-      </div>
-
-      <div v-else class="content-grid">
-        <div v-for="item in contentList" :key="item.id" class="content-card-item" :class="{ selected: selectedIds.includes(item.id) }">
-          <div class="card-check">
-            <el-checkbox v-model="selectedIds" :value="item.id" />
-          </div>
-          <div class="card-top">
-            <div class="card-title-row">
-              <span class="card-title-text" @click="goView(item.id)">{{ item.title }}</span>
-              <el-tag :type="(getStatusMeta(CONTENT_STATUSES, item.status).tagType) as any" size="small" class="status-badge">
-                {{ getStatusMeta(CONTENT_STATUSES, item.status).label }}
-              </el-tag>
-            </div>
-            <div class="card-meta">
-              <span class="platform-badge">{{ getPlatformIcon(item.platform) }} {{ getPlatformName(item.platform) }}</span>
-              <span class="date">{{ formatDate(item.updated_at) }}</span>
-            </div>
-          </div>
-
-          <div v-if="item.body" class="card-body-preview">
-            {{ truncate(item.body, 100) }}
-          </div>
-
-          <div v-if="item.tags && item.tags.length" class="card-tags">
-            <el-tag v-for="tag in item.tags" :key="tag" size="small" class="tag">#{{ tag }}</el-tag>
-          </div>
-
-          <div class="card-actions">
-            <el-button size="small" @click="goView(item.id)">👁 查看</el-button>
-            <el-button size="small" type="primary" @click="goEdit(item.id)">✏️ 编辑</el-button>
-            <el-button size="small" @click="onDuplicate(item.id)" title="复制为新草稿">📋 复制</el-button>
-            <el-button v-if="canSubmitReview(item.status)" size="small" type="warning" @click="onSubmitReview(item.id)">📋 审核</el-button>
-            <el-button size="small" type="danger" @click="onDelete(item.id, item.title)">🗑 删除</el-button>
-          </div>
+        <div v-if="item.tags && item.tags.length" class="tags">
+          <span v-for="tag in item.tags" :key="tag" class="ds-pill ds-pill--neutral">#{{ tag }}</span>
         </div>
-      </div>
 
-      <div class="pagination-wrapper" v-if="total > pageSize">
-        <el-pagination
-          v-model:current-page="currentPage"
-          :page-size="pageSize"
-          :total="total"
-          layout="prev, pager, next, total"
-          background
-          @current-change="loadPage"
-        />
-      </div>
-    </el-card>
+        <div class="actions">
+          <el-button size="small" @click="goView(item.id)">查看</el-button>
+          <el-button size="small" type="primary" @click="goEdit(item.id)">编辑</el-button>
+          <el-button size="small" v-if="canSubmitReview(item.status)" @click="onSubmitReview(item.id)">提交审核</el-button>
+          <el-button size="small" @click="onDuplicate(item.id)">复制</el-button>
+          <div style="flex: 1"></div>
+          <el-button size="small" type="danger" text @click="onDelete(item.id, item.title)">删除</el-button>
+        </div>
+      </article>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="contentList.length > 0" class="ds-pagination">
+      <el-pagination
+        v-model:current-page="currentPage"
+        :page-size="pageSize"
+        :total="total"
+        layout="prev, pager, next, total"
+        background
+        @current-change="loadPage"
+      />
+    </div>
   </div>
 </template>
 
@@ -103,9 +109,8 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Loading } from '@element-plus/icons-vue'
 import { contentApi, type Content } from '@/api/content'
-import { CONTENT_STATUSES, PLATFORM_OPTIONS, getStatusMeta, getPlatformName, getPlatformIcon, formatDate } from '@/constants'
+import { CONTENT_STATUSES, PLATFORM_OPTIONS, getStatusMeta, getPlatformName, formatDate } from '@/constants'
 
 const router = useRouter()
 
@@ -125,6 +130,13 @@ const truncate = (text: string, len: number) => {
 }
 
 const canSubmitReview = (status: string) => status === 'draft' || status === 'failed'
+
+const statusClass = (s: string) => {
+  if (s === 'published' || s === 'completed') return 'ds-status--success'
+  if (s === 'pending') return 'ds-status--warning'
+  if (s === 'failed' || s === 'archived') return 'ds-status--error'
+  return 'ds-status--neutral'
+}
 
 const loadPage = async (page: number) => {
   loading.value = true
@@ -262,243 +274,10 @@ onMounted(() => loadPage(1))
 </script>
 
 <style scoped>
-.content-page {
-  padding: 0;
-}
-
-.content-card {
-  background: rgba(26, 26, 46, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.title-icon {
-  font-size: 20px;
-}
-
-.count-tag {
-  margin-left: 4px;
-}
-
-.filter-bar {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.search-input {
-  width: 240px;
-}
-
-.bulk-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  padding: 4px 12px;
-  background: rgba(0, 212, 255, 0.1);
-  border-radius: 8px;
-  border: 1px solid rgba(0, 212, 255, 0.3);
-}
-
-.bulk-label {
-  color: #00d4ff;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.content-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
-
-.content-card-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.content-card-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(0, 212, 255, 0.2);
-  transform: translateY(-2px);
-}
-
-.content-card-item.selected {
-  border-color: #00d4ff;
-  background: rgba(0, 212, 255, 0.05);
-}
-
-.card-check {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 1;
-}
-
-.card-top {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.card-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.card-title-text {
-  font-size: 15px;
-  font-weight: 600;
-  color: #fff;
-  line-height: 1.4;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.card-title-text:hover {
-  color: #00d4ff;
-}
-
-.status-badge {
-  flex-shrink: 0;
-  border: none;
-}
-
-.card-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: #888;
-}
-
-.platform-badge {
-  background: rgba(102, 126, 234, 0.15);
-  color: #a78bfa;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.date {
-  color: #666;
-}
-
-.card-body-preview {
-  font-size: 13px;
-  color: #aaa;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.tag {
-  background: rgba(0, 212, 255, 0.1);
-  border: none;
-  color: #00d4ff;
-  font-size: 11px;
-}
-
-.card-actions {
-  display: flex;
-  gap: 4px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  margin-top: auto;
-  flex-wrap: wrap;
-}
-
-.card-actions .el-button {
-  flex: 1;
-  min-width: 60px;
-  font-size: 11px;
-  padding: 4px 6px;
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.empty-state,
-.loading-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: #666;
-}
-
-.empty-state span,
-.loading-state span {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 16px;
-}
-
-.empty-state .hint {
-  font-size: 13px;
-  color: #444;
-  margin-top: 8px;
-}
-
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.loading-state span {
-  font-size: 16px;
+.ds-pagination {
+  display: flex; justify-content: center;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--claude-border-cream);
 }
 </style>

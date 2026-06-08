@@ -40,6 +40,26 @@ class VideoScriptRequest(BaseModel):
 
 class ImageGenerateRequest(BaseModel):
     prompt: str
+    style: Optional[str] = "写实摄影"   # 风格: 写实摄影/插画/3D 渲染/水墨/极简矢量
+    ratio: Optional[str] = "1:1"        # 1:1 / 16:9 / 9:16 / 4:3 / 3:4
+    n: Optional[int] = 1                # 生成数量 1-4
+    negative_prompt: Optional[str] = None
+
+
+class ImageRecord(BaseModel):
+    id: str
+    prompt: str
+    style: str = "写实摄影"
+    ratio: str = "1:1"
+    image_url: str
+    is_mock: bool = False
+    model: str = "MiniMax-Image-01"
+    created_at: str
+
+
+class ImageListResponse(BaseModel):
+    total: int
+    items: List[ImageRecord]
 
 
 # ============ 路由 ============
@@ -124,16 +144,83 @@ async def generate_video_script(req: VideoScriptRequest) -> Dict[str, Any]:
 
 @router.post("/image")
 async def generate_image(req: ImageGenerateRequest) -> Dict[str, Any]:
-    """图像生成"""
+    """图像生成 — 真 API 失败时降级到 mock, 保证前端不报错"""
+    from app.store import store
+    n = max(1, min(req.n or 1, 4))
+    is_mock = False
+    image_urls: List[str] = []
+    error_msg: Optional[str] = None
+
     try:
         from app.services.minimax_client import MiniMaxClient
         client = MiniMaxClient()
-        image_url = await client.generate_image(req.prompt)
-        return {"image_url": image_url}
+        for _ in range(n):
+            url = await client.generate_image(req.prompt)
+            image_urls.append(url)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # No API key configured — fall back to mock deterministically
+        import hashlib
+        is_mock = True
+        error_msg = str(e)
+        for _ in range(n):
+            seed = hashlib.md5((req.prompt + str(len(image_urls))).encode()).hexdigest()[:8]
+            image_urls.append(f"https://picsum.photos/seed/{seed}/1024/1024")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Real API error — fall back to mock rather than 500
+        import hashlib
+        is_mock = True
+        error_msg = f"{type(e).__name__}: {e}"
+        for _ in range(n):
+            seed = hashlib.md5((req.prompt + str(len(image_urls))).encode()).hexdigest()[:8]
+            image_urls.append(f"https://picsum.photos/seed/{seed}/1024/1024")
+
+    # Persist records
+    records = []
+    for url in image_urls:
+        rec = store.add_image({
+            "prompt": req.prompt,
+            "style": req.style or "写实摄影",
+            "ratio": req.ratio or "1:1",
+            "image_url": url,
+            "is_mock": is_mock,
+            "model": "image-01",
+        })
+        records.append(rec)
+
+    return {
+        "items": records,
+        "count": len(records),
+        "is_mock": is_mock,
+        "error": error_msg,
+    }
+
+
+@router.get("/image/list")
+async def list_images(limit: int = 50) -> ImageListResponse:
+    """列出最近生成的图片"""
+    from app.store import store
+    items = store.list_images(limit=limit)
+    return ImageListResponse(total=len(items), items=items)
+
+
+@router.get("/image/{image_id}")
+async def get_image(image_id: str) -> ImageRecord:
+    """获取单张图片详情"""
+    from app.store import store
+    rec = store.get_image(image_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return rec
+
+
+@router.delete("/image/{image_id}")
+async def delete_image(image_id: str) -> Dict[str, Any]:
+    """删除一张图片"""
+    from app.store import store
+    ok = store.delete_image(image_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return {"ok": True, "id": image_id}
 
 
 @router.post("/video/generate")

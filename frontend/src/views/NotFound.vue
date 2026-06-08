@@ -1,52 +1,45 @@
 <template>
   <div class="not-found">
-    <div class="content">
+    <div class="frame">
       <div class="big">404</div>
-      <h1>页面未找到</h1>
-      <p>您访问的页面不存在或已被移除</p>
-      <el-button type="primary" @click="$router.push('/content')" size="large">
-        返回首页
-      </el-button>
+      <h1>这页没找到</h1>
+      <p>你访问的页面可能不存在、被移除，或者链接拼错了。</p>
+      <div class="actions">
+        <el-button @click="$router.back()">返回上页</el-button>
+        <el-button type="primary" @click="$router.push('/content')">回首页</el-button>
+      </div>
     </div>
   </div>
 </template>
 
-<script setup lang="ts">
-// 404 page
-</script>
-
 <style scoped>
 .not-found {
-  height: calc(100vh - 100px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: calc(100vh - 200px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 24px;
 }
-
-.content {
+.frame {
   text-align: center;
-  color: #fff;
+  max-width: 480px;
 }
-
 .big {
-  font-size: 120px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-family: var(--font-serif);
+  font-size: 140px; font-weight: 500;
+  color: var(--claude-terracotta);
   line-height: 1;
+  letter-spacing: -0.04em;
   margin-bottom: 16px;
 }
-
 h1 {
-  font-size: 24px;
-  margin-bottom: 8px;
-  color: #fff;
+  font-family: var(--font-serif);
+  font-size: 28px; font-weight: 500;
+  color: var(--claude-ink);
+  margin: 0 0 12px;
+  letter-spacing: -0.015em;
 }
-
 p {
-  color: #888;
-  margin-bottom: 24px;
+  font-size: 16px; color: var(--claude-olive);
+  line-height: 1.55; margin: 0 0 24px;
 }
+.actions { display: flex; gap: 12px; justify-content: center; }
 </style>

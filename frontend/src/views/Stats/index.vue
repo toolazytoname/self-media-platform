@@ -1,300 +1,244 @@
 <template>
-  <div class="stats-page">
-    <!-- 顶部数据卡 -->
-    <el-row :gutter="20" class="stats-row">
-      <el-col :xs="12" :sm="6">
-        <div class="stat-card">
-          <div class="stat-icon">📝</div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stats.content_total }}</div>
-            <div class="stat-label">内容总数</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :xs="12" :sm="6">
-        <div class="stat-card">
-          <div class="stat-icon">💡</div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stats.topics_total }}</div>
-            <div class="stat-label">选题总数</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :xs="12" :sm="6">
-        <div class="stat-card">
-          <div class="stat-icon">🖼️</div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stats.materials_total }}</div>
-            <div class="stat-label">素材总数</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :xs="12" :sm="6">
-        <div class="stat-card highlight">
-          <div class="stat-icon">⏳</div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stats.review_pending }}</div>
-            <div class="stat-label">待审核</div>
-          </div>
-        </div>
-      </el-col>
-    </el-row>
+  <div>
+    <header class="page-header">
+      <div class="breadcrumb">
+        <router-link to="/stats">系统</router-link>
+        <span>·</span>
+        <span>数据</span>
+      </div>
+      <h1 class="page-title">数据</h1>
+      <p class="page-subtitle">一目了然地看你的内容产出、待办、和分发情况。</p>
+    </header>
 
-    <el-row :gutter="20" class="stats-row-2">
-      <el-col :xs="12" :sm="6">
-        <div class="stat-card mini">
-          <div class="stat-info">
-            <div class="stat-value-sm">{{ stats.content_draft }}</div>
-            <div class="stat-label">草稿</div>
-          </div>
+    <!-- Top metric tiles -->
+    <section class="metric-row">
+      <article class="metric-tile">
+        <div class="metric-icon">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="4" y="3" width="12" height="14" rx="1.5" />
+            <path d="M7 6h6M7 9h6M7 12h4" stroke-linecap="round" />
+          </svg>
         </div>
-      </el-col>
-      <el-col :xs="12" :sm="6">
-        <div class="stat-card mini">
-          <div class="stat-info">
-            <div class="stat-value-sm">{{ stats.content_pending }}</div>
-            <div class="stat-label">待发布</div>
-          </div>
+        <div class="metric-label">内容总数</div>
+        <div class="metric-value">{{ stats.content_total }}</div>
+        <div class="metric-foot">
+          <span class="ds-status ds-status--success"><span class="dot"></span>草稿 {{ stats.content_draft }}</span>
         </div>
-      </el-col>
-      <el-col :xs="12" :sm="6">
-        <div class="stat-card mini success">
-          <div class="stat-info">
-            <div class="stat-value-sm">{{ stats.content_published }}</div>
-            <div class="stat-label">已发布</div>
-          </div>
+      </article>
+      <article class="metric-tile">
+        <div class="metric-icon">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.4 1.4M13.6 13.6L15 15M5 15l1.4-1.4M13.6 6.4L15 5" stroke-linecap="round" />
+            <circle cx="10" cy="10" r="2" />
+          </svg>
         </div>
-      </el-col>
-      <el-col :xs="12" :sm="6">
-        <div class="stat-card mini">
-          <div class="stat-info">
-            <div class="stat-value-sm">{{ stats.platforms_connected }}</div>
-            <div class="stat-label">已连平台</div>
-          </div>
+        <div class="metric-label">选题总数</div>
+        <div class="metric-value">{{ stats.topics_total }}</div>
+        <div class="metric-foot">
+          <span class="caption">选题 / 想法</span>
         </div>
-      </el-col>
-    </el-row>
+      </article>
+      <article class="metric-tile">
+        <div class="metric-icon">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="14" height="14" rx="2" />
+            <circle cx="7.5" cy="7.5" r="1.5" />
+            <path d="M3 13l4-4 3 3 3-3 4 4" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="metric-label">素材总数</div>
+        <div class="metric-value">{{ stats.materials_total }}</div>
+        <div class="metric-foot">
+          <span class="caption">图片 / 视频 / 音频</span>
+        </div>
+      </article>
+      <article class="metric-tile metric-tile--accent">
+        <div class="metric-icon">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="10" cy="10" r="7.5" />
+            <path d="M10 6v4l2.5 2.5" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div class="metric-label">待审核</div>
+        <div class="metric-value">{{ stats.review_pending }}</div>
+        <div class="metric-foot">
+          <span class="ds-pill ds-pill--warning">需处理</span>
+        </div>
+      </article>
+    </section>
 
-    <el-row :gutter="20" class="charts-row">
-      <el-col :xs="24" :md="12">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-title">
-              <span>📊</span>
-              <span>平台发布分布</span>
+    <div class="charts-grid">
+      <!-- Platform distribution -->
+      <section class="ds-card chart-card">
+        <h2 class="ds-card__title">平台发布分布</h2>
+        <p class="ds-card__lede">已发布到各平台的内容数量。</p>
+        <div v-if="platformEntries.length === 0" class="ds-empty ds-empty--compact">
+          <p>暂无发布数据</p>
+          <p class="caption">发布内容后这里会显示统计</p>
+        </div>
+        <div v-else class="bar-list">
+          <div v-for="(item, index) in platformEntries" :key="item.platform" class="bar-row">
+            <div class="bar-name">
+              <span class="ds-pill ds-pill--neutral">{{ getPlatformName(item.platform) }}</span>
             </div>
-          </template>
-          <div v-if="platformEntries.length === 0" class="empty-chart">
-            <span>📊</span>
-            <p>暂无发布数据</p>
-            <p class="hint">发布内容后这里会显示统计</p>
-          </div>
-          <div v-else class="platform-list">
-            <div v-for="(item, index) in platformEntries" :key="item.platform" class="platform-item">
-              <div class="platform-name">
-                <span>{{ getPlatformIcon(item.platform) }}</span>
-                <span>{{ getPlatformName(item.platform) }}</span>
-              </div>
-              <div class="platform-bar">
-                <div class="bar-fill" :style="{ width: item.percent + '%', background: barColor(index) }"></div>
-              </div>
-              <div class="platform-count">{{ item.count }}</div>
+            <div class="bar-track">
+              <div class="bar-fill" :style="{ width: item.percent + '%', background: barColor(index) }"></div>
             </div>
+            <div class="bar-value mono">{{ item.count }}</div>
           </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :md="12">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-title">
-              <span>📈</span>
-              <span>内容状态分布</span>
-            </div>
-          </template>
-          <div v-if="stats.content_total === 0" class="empty-chart">
-            <span>📈</span>
-            <p>暂无内容</p>
-            <p class="hint">创建内容后这里会显示状态分布</p>
-          </div>
-          <div v-else class="platform-list">
-            <div v-for="item in contentStatusEntries" :key="item.status" class="platform-item">
-              <div class="platform-name">
-                <el-tag :type="(item.tagType) as any" size="small">{{ item.label }}</el-tag>
-              </div>
-              <div class="platform-bar">
-                <div class="bar-fill" :style="{ width: item.percent + '%' }"></div>
-              </div>
-              <div class="platform-count">{{ item.count }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+        </div>
+      </section>
 
-    <el-row :gutter="20" class="charts-row">
-      <el-col :span="24">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-title">
-              <span>📋</span>
-              <span>汇总数据</span>
+      <!-- Content status distribution -->
+      <section class="ds-card chart-card">
+        <h2 class="ds-card__title">内容状态分布</h2>
+        <p class="ds-card__lede">各状态下内容数量的占比。</p>
+        <div v-if="stats.content_total === 0" class="ds-empty ds-empty--compact">
+          <p>暂无内容</p>
+          <p class="caption">创建内容后这里会显示状态分布</p>
+        </div>
+        <div v-else class="bar-list">
+          <div v-for="item in contentStatusEntries" :key="item.status" class="bar-row">
+            <div class="bar-name">
+              <span class="ds-pill" :class="`ds-pill--${item.status === 'published' ? 'success' : item.status === 'pending' ? 'warning' : 'neutral'}`">
+                {{ item.label }}
+              </span>
             </div>
-          </template>
-          <el-descriptions :column="3" border>
-            <el-descriptions-item label="发布记录总数">{{ stats.publish_records_total }}</el-descriptions-item>
-            <el-descriptions-item label="调度任务总数">{{ stats.scheduled_tasks_total }}</el-descriptions-item>
-            <el-descriptions-item label="已连接平台数">{{ stats.platforms_connected }}</el-descriptions-item>
-            <el-descriptions-item label="选题完成率">{{ topicDoneRate }}%</el-descriptions-item>
-            <el-descriptions-item label="内容发布率">{{ contentPublishedRate }}%</el-descriptions-item>
-            <el-descriptions-item label="审核通过率">{{ reviewApprovedRate }}%</el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </el-col>
-    </el-row>
+            <div class="bar-track">
+              <div class="bar-fill" :style="{ width: item.percent + '%' }"></div>
+            </div>
+            <div class="bar-value mono">{{ item.count }}</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="ds-card" style="margin-top: 32px">
+      <h2 class="ds-card__title">汇总</h2>
+      <p class="ds-card__lede">平台、账号、模板、发布记录等基础数据的总量。</p>
+      <el-descriptions :column="3" border>
+        <el-descriptions-item label="发布记录">{{ stats.publish_records_total }}</el-descriptions-item>
+        <el-descriptions-item label="已连接平台">{{ stats.platforms_connected }}</el-descriptions-item>
+        <el-descriptions-item label="调度任务">{{ stats.scheduled_tasks_total }}</el-descriptions-item>
+      </el-descriptions>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { statsApi, type Stats as StatsType } from '@/api/cms'
-import { getPlatformName, getPlatformIcon, CONTENT_STATUSES, getStatusMeta } from '@/constants'
+import { computed, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { statsApi, type Stats } from '@/api/cms'
+import { getPlatformName, CONTENT_STATUSES } from '@/constants'
 
-const stats = ref<StatsType>({
-  topics_total: 0,
-  materials_total: 0,
-  review_pending: 0,
-  content_total: 0,
-  content_draft: 0,
-  content_pending: 0,
-  content_published: 0,
-  platforms_connected: 0,
-  publish_records_total: 0,
-  scheduled_tasks_total: 0,
-  platform_distribution: {},
+const stats = ref<any>({
+  content_total: 0, content_draft: 0, content_pending: 0, content_published: 0,
+  topics_total: 0, materials_total: 0, review_pending: 0,
+  publish_records_total: 0, scheduled_tasks_total: 0, platforms_connected: 0,
+  platform_distribution: {} as Record<string, number>,
 })
 
-const loading = ref(false)
+const COLORS = ['#c96442', '#d97757', '#10b981', '#3898ec', '#87867f', '#5e5d59']
+const barColor = (i: number) => COLORS[i % COLORS.length]
 
 const platformEntries = computed(() => {
-  const entries = Object.entries(stats.value.platform_distribution || {})
-    .map(([platform, count]) => ({ platform, count, percent: 0 }))
+  const obj: Record<string, number> = stats.value.platform_distribution || {}
+  const total = Object.values(obj).reduce((s, v) => s + (v || 0), 0)
+  if (total === 0) return []
+  return Object.entries(obj)
+    .map(([platform, count]) => ({ platform, count, percent: Math.round((count / total) * 100) }))
     .sort((a, b) => b.count - a.count)
-  const max = Math.max(1, ...entries.map(e => e.count))
-  entries.forEach(e => e.percent = Math.round((e.count / max) * 100))
-  return entries
 })
 
 const contentStatusEntries = computed(() => {
-  const items = [
-    { status: 'draft', count: stats.value.content_draft },
-    { status: 'pending', count: stats.value.content_pending },
-    { status: 'published', count: stats.value.content_published },
-  ]
-  const max = Math.max(1, ...items.map(i => i.count))
-  return items
-    .filter(i => i.count > 0)
-    .map(i => {
-      const meta = getStatusMeta(CONTENT_STATUSES, i.status)
-      return { ...i, label: meta.label, tagType: meta.tagType, percent: Math.round((i.count / max) * 100) }
-    })
+  const total = (stats.value.content_draft || 0) + (stats.value.content_pending || 0) + (stats.value.content_published || 0)
+  if (total === 0) return []
+  return [
+    { status: 'draft', label: '草稿', count: stats.value.content_draft || 0, percent: Math.round(((stats.value.content_draft || 0) / total) * 100) },
+    { status: 'pending', label: '待审核', count: stats.value.content_pending || 0, percent: Math.round(((stats.value.content_pending || 0) / total) * 100) },
+    { status: 'published', label: '已发布', count: stats.value.content_published || 0, percent: Math.round(((stats.value.content_published || 0) / total) * 100) },
+  ].filter(s => s.count > 0).sort((a, b) => b.count - a.count)
 })
 
-const barColor = (idx: number) => {
-  const colors = [
-    'linear-gradient(90deg, #00d4ff 0%, #00a8cc 100%)',
-    'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
-    'linear-gradient(90deg, #f093fb 0%, #f5576c 100%)',
-    'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%)',
-    'linear-gradient(90deg, #43e97b 0%, #38f9d7 100%)',
-    'linear-gradient(90deg, #fa709a 0%, #fee140 100%)',
-  ]
-  return colors[idx % colors.length]
-}
-
-const topicDoneRate = computed(() => {
-  if (stats.value.topics_total === 0) return 0
-  // 这里简化为：active 的占比
-  return 0
-})
-
-const contentPublishedRate = computed(() => {
-  if (stats.value.content_total === 0) return 0
-  return Math.round((stats.value.content_published / stats.value.content_total) * 100)
-})
-
-const reviewApprovedRate = computed(() => {
-  const reviewed = stats.value.publish_records_total - stats.value.review_pending
-  if (stats.value.publish_records_total === 0) return 0
-  return Math.round((reviewed / stats.value.publish_records_total) * 100)
-})
-
-const loadStats = async () => {
-  loading.value = true
+const load = async () => {
   try {
-    const data = await statsApi.get()
-    stats.value = data
-  } catch (e) {
-    console.error('Failed to load stats:', e)
-  } finally {
-    loading.value = false
+    const resp = await statsApi.get()
+    stats.value = { ...stats.value, ...resp }
+  } catch (e: any) {
+    ElMessage.error('加载统计失败: ' + (e.normalizedMessage || e.message))
   }
 }
 
-onMounted(loadStats)
+onMounted(load)
 </script>
 
 <style scoped>
-.stats-page { padding: 0; }
-.stats-row, .stats-row-2, .charts-row { margin-bottom: 20px; }
-.stat-card {
-  background: rgba(26, 26, 46, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+.metric-row {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: 32px;
+}
+.metric-tile {
+  background: var(--claude-ivory);
+  border: 1px solid var(--claude-border-cream);
+  border-radius: var(--radius-xl);
   padding: 24px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  transition: all 0.3s ease;
-  height: 100%;
+  display: flex; flex-direction: column; gap: 8px;
+  position: relative;
 }
-.stat-card:hover { transform: translateY(-4px); border-color: rgba(0, 212, 255, 0.3); }
-.stat-card.highlight {
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(26, 26, 46, 0.6) 100%);
-  border-color: rgba(0, 212, 255, 0.3);
+.metric-tile .metric-icon {
+  position: absolute; top: 20px; right: 20px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--claude-parchment);
+  border: 1px solid var(--claude-border-cream);
+  border-radius: 10px;
+  color: var(--claude-terracotta);
 }
-.stat-card.mini { padding: 16px 20px; }
-.stat-card.mini.success { border-color: rgba(0, 212, 100, 0.3); }
-.stat-icon { font-size: 36px; }
-.stat-value { font-size: 32px; font-weight: 700; color: #fff; line-height: 1; }
-.stat-value-sm { font-size: 22px; font-weight: 700; color: #fff; line-height: 1; }
-.stat-label { font-size: 13px; color: #a0a0b0; margin-top: 6px; }
-.chart-card {
-  background: rgba(26, 26, 46, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  height: 100%;
+.metric-tile--accent .metric-icon {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.10);
+  color: var(--claude-coral);
 }
-.card-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: #fff; }
-.empty-chart { text-align: center; padding: 40px 20px; color: #666; }
-.empty-chart span { font-size: 48px; display: block; margin-bottom: 12px; opacity: 0.5; }
-.empty-chart .hint { font-size: 12px; color: #444; margin-top: 4px; }
-.platform-list { display: flex; flex-direction: column; gap: 16px; }
-.platform-item { display: flex; align-items: center; gap: 16px; }
-.platform-name { width: 110px; font-size: 13px; color: #e0e0e0; display: flex; align-items: center; gap: 6px; }
-.platform-bar {
-  flex: 1;
-  height: 10px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 5px;
-  overflow: hidden;
+.metric-tile--accent {
+  background: var(--claude-ink);
+  border-color: var(--claude-ink);
+  color: var(--claude-ivory);
+}
+.metric-tile--accent .metric-label,
+.metric-tile--accent .metric-foot { color: var(--claude-warm-silver); }
+.metric-label {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--claude-stone); font-weight: 500;
+}
+.metric-value {
+  font-family: var(--font-serif);
+  font-size: 48px; font-weight: 500; line-height: 1;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.metric-foot { font-size: 12px; }
+
+.charts-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+}
+.chart-card { min-height: 320px; }
+
+.bar-list { display: flex; flex-direction: column; gap: 14px; }
+.bar-row {
+  display: grid; grid-template-columns: 120px 1fr 50px;
+  align-items: center; gap: 12px;
+}
+.bar-track {
+  height: 8px; background: var(--claude-border-cream);
+  border-radius: 9999px; overflow: hidden;
 }
 .bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #00d4ff 0%, #00a8cc 100%);
-  border-radius: 5px;
-  transition: width 0.5s ease;
+  height: 100%; border-radius: 9999px;
+  transition: width 0.3s ease;
 }
-.platform-count { width: 50px; text-align: right; font-size: 14px; color: #00d4ff; font-weight: 600; }
-:deep(.el-descriptions__label) { color: #a0a0b0; }
-:deep(.el-descriptions__content) { color: #fff; }
+.bar-value { text-align: right; font-size: 13px; color: var(--claude-ink); }
+.ds-empty--compact { padding: 32px 16px; }
 </style>

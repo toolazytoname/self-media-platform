@@ -26,34 +26,60 @@ class MiniMaxClient:
         model: Optional[str] = None,
         **kwargs
     ) -> str:
-        """对话生成 - 使用正确的 MiniMax 端点"""
+        """对话生成 - 使用正确的 MiniMax 端点
+
+        试用 /v1/text/chatcompletion_v2 (minimax 官方)，fallback 到 OpenAI 兼容的
+        /v1/chat/completions。两者都失败时抛清晰错误（key 限图权限等）。
+        """
         model = model or self.default_model
+        base = self.base_url.rstrip('/')
 
-        # MiniMax 使用 /text/chatcompletion_v2 端点
-        url = self.base_url.rstrip('/') + "/text/chatcompletion_v2"
+        # 备用端点列表
+        endpoints = [
+            (f"{base}/text/chatcompletion_v2", "minimax-native"),
+            (f"{base}/chat/completions", "openai-compat"),
+        ]
 
-        headers = {
-            "Authorization": 'Bearer ' + self.api_key,
-            "Content-Type": "application/json"
-        }
-        data = {"model": model, "messages": messages}
+        last_error = None
+        for url, label in endpoints:
+            try:
+                headers = {
+                    "Authorization": 'Bearer ' + self.api_key,
+                    "Content-Type": "application/json"
+                }
+                data = {"model": model, "messages": messages}
+                with httpx.Client(timeout=60.0) as client:
+                    response = client.post(url, headers=headers, json=data)
 
-        with httpx.Client(timeout=60.0) as client:
-            response = client.post(url, headers=headers, json=data)
+                result = response.json()
 
-        result = response.json()
+                # 区分: minimax 风格 200+1004 (无权限) vs OpenAI 风格 401 (无 key)
+                if "base_resp" in result:
+                    base_resp = result.get("base_resp", {})
+                    if base_resp.get("status_code") == 0:
+                        # 真成功
+                        choices = result.get("choices", [])
+                        if choices:
+                            return choices[0]["message"]["content"]
+                    # 1004 'login fail' 意味着 key 不被这个端点接受, 试下一个
+                    last_error = f"{label}: {base_resp.get('status_msg', 'unknown')}"
+                    continue
 
-        # MiniMax API 返回格式检查
-        base_resp = result.get("base_resp", {})
-        if base_resp.get("status_code") != 0:
-            raise Exception("API Error: " + base_resp.get("status_msg", "Unknown"))
+                # OpenAI 风格成功
+                if "choices" in result and result["choices"]:
+                    return result["choices"][0]["message"]["content"]
 
-        # MiniMax 成功响应的格式
-        choices = result.get("choices", [])
-        if choices:
-            return choices[0]["message"]["content"]
-        else:
-            raise Exception("No choices in response: " + str(result))
+                last_error = f"{label}: 响应无 choices 字段"
+            except Exception as e:
+                last_error = f"{label}: {type(e).__name__}: {e}"
+                continue
+
+        # 都失败
+        raise Exception(
+            f"AI 文本服务不可用 ({last_error})。"
+            f"可能原因：API key 限图权限、无效、或服务暂不可用。"
+            f"请检查 key 或换一个有 text 权限的 key。"
+        )
 
     async def content_summary(self, content: str) -> Dict[str, Any]:
         """内容摘要 - 将长文/URL/PDF内容提取要点"""
@@ -69,11 +95,15 @@ class MiniMaxClient:
     async def generate_image(
         self,
         prompt: str,
-        model: str = "MiniMax-Image-01"
+        model: str = "image-01"
     ) -> str:
-        """图像生成 - 返回图片URL"""
-        url = self.base_url.rstrip('/') + "/images/generations"
-        
+        """图像生成 - 返回图片 URL
+
+        MiniMax 的 image 端点是 /v1/image_generation（不是 OpenAI 风格的
+        /v1/images/generations）。响应是 {"data": {"image_urls": [...]}, ...}。
+        """
+        url = self.base_url.rstrip('/') + "/image_generation"
+
         headers = {
             "Authorization": 'Bearer ' + self.api_key,
             "Content-Type": "application/json"
@@ -82,15 +112,18 @@ class MiniMaxClient:
             "model": model,
             "prompt": prompt
         }
-        
+
         with httpx.Client(timeout=120.0) as client:
             response = client.post(url, headers=headers, json=data)
-        
+
         if response.status_code != 200:
             raise Exception("API Error: " + response.text)
-        
+
         result = response.json()
-        return result["data"][0]["url"]
+        urls = result.get("data", {}).get("image_urls") or []
+        if not urls:
+            raise Exception("No image_urls in response: " + str(result)[:300])
+        return urls[0]
 
     # ============ 语音合成 ============
 
@@ -156,27 +189,31 @@ class MiniMaxClient:
         prompt: str,
         duration: int = 6
     ) -> str:
-        """视频生成 - 返回视频URL (限额3条/日)"""
-        url = self.base_url.rstrip('/') + "/video/generations"
-        
+        """视频生成 - 返回任务 ID (限额3条/日)
+
+        MiniMax 端点是 /v1/video_generation（不是 OpenAI 风格的 /video/generations）。
+        """
+        url = self.base_url.rstrip('/') + "/video_generation"
+
         headers = {
             "Authorization": 'Bearer ' + self.api_key,
             "Content-Type": "application/json"
         }
         data = {
-            "model": "MiniMax-Video",
+            "model": "MiniMax-Hailuo-03",
             "prompt": prompt,
             "duration": duration
         }
-        
-        with httpx.Client(timeout=30.0) as client:
+
+        with httpx.Client(timeout=60.0) as client:
             response = client.post(url, headers=headers, json=data)
-        
+
         if response.status_code != 200:
             raise Exception("API Error: " + response.text)
-        
+
         result = response.json()
-        return result["id"]
+        # MiniMax 返回 job_id 在 base_resp 或顶层, 兼容两种
+        return result.get("id") or result.get("job_id") or result.get("data", {}).get("id")
 
     async def get_video_status(self, job_id: str) -> Dict[str, Any]:
         """获取视频生成状态"""
