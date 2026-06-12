@@ -1,8 +1,15 @@
 # MiniMax API 集成
 
+import asyncio
 import os
+import time
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 import httpx
+
+
+# Hailuo-03 支持的时长档位(minimax 官方约束)
+DOUYIN_DURATION_OPTIONS = [3, 6, 10]
 
 
 class MiniMaxClient:
@@ -193,6 +200,11 @@ class MiniMaxClient:
 
         MiniMax 端点是 /v1/video_generation（不是 OpenAI 风格的 /video/generations）。
         """
+        if duration not in DOUYIN_DURATION_OPTIONS:
+            raise ValueError(
+                f"duration 必须是 {DOUYIN_DURATION_OPTIONS} 之一,收到 {duration}"
+            )
+
         url = self.base_url.rstrip('/') + "/video_generation"
 
         headers = {
@@ -213,26 +225,150 @@ class MiniMaxClient:
 
         result = response.json()
         # MiniMax 返回 job_id 在 base_resp 或顶层, 兼容两种
-        return result.get("id") or result.get("job_id") or result.get("data", {}).get("id")
+        job_id = (
+            result.get("id")
+            or result.get("job_id")
+            or result.get("data", {}).get("id")
+            or result.get("base_resp", {}).get("id")
+        )
+        if not job_id:
+            raise Exception(
+                "MiniMax 未返回 job_id,响应: " + str(result)[:300]
+            )
+        return job_id
 
     async def get_video_status(self, job_id: str) -> Dict[str, Any]:
-        """获取视频生成状态"""
-        url = self.base_url.rstrip('/') + f"/video/generations/{job_id}"
-        
+        """获取视频生成状态。
+
+        注意: 状态端点路径与创建端点保持一致(/video_generation/{id}),
+        旧版 /video/generations/{id} 是早期 OpenAI 风格的猜测,已修正。
+        """
+        url = self.base_url.rstrip('/') + f"/video_generation/{job_id}"
+
         headers = {
             "Authorization": 'Bearer ' + self.api_key,
         }
-        
+
         with httpx.Client(timeout=30.0) as client:
             response = client.get(url, headers=headers)
-        
+
         if response.status_code != 200:
             raise Exception("API Error: " + response.text)
-        
+
         result = response.json()
+        # 兼容多种返回结构
+        video_url = (
+            result.get("video_url")
+            or result.get("output", {}).get("video_url")
+            or result.get("data", {}).get("video_url")
+        )
         return {
             "status": result.get("status", "unknown"),
-            "video_url": result.get("output", {}).get("video_url") if "output" in result else None
+            "video_url": video_url,
+        }
+
+    async def poll_video(
+        self,
+        job_id: str,
+        max_wait: int = 600,
+        interval: int = 5
+    ) -> Dict[str, Any]:
+        """轮询视频生成状态,直到完成 / 失败 / 超时。
+
+        返回最后一次 `get_video_status` 的 dict。指数 backoff(5→10→20→30s cap)。
+        """
+        deadline = time.time() + max_wait
+        delay = interval
+        last_status: Dict[str, Any] = {}
+        while time.time() < deadline:
+            try:
+                st = await self.get_video_status(job_id)
+            except Exception as e:
+                # 单次轮询失败不终止 — minimax 偶尔返 5xx
+                last_status = {"status": "polling_error", "error": str(e)}
+            else:
+                last_status = st
+                status_lower = (st.get("status") or "").lower()
+                if status_lower in ("success", "finished", "completed", "succeeded"):
+                    return st
+                if status_lower in ("failed", "error", "cancelled"):
+                    return st
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 30)
+        # 超时: 返回最后一次状态(由 caller 决定怎么处理)
+        return last_status or {"status": "timeout"}
+
+    async def download_video(self, url: str, dest_path: str) -> str:
+        """把视频 URL 流式下载到本地。校验 Content-Type 是 video/*。"""
+        dest = Path(dest_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        async with httpx.AsyncClient(timeout=300.0, follow_redirects=True) as client:
+            async with client.stream("GET", url) as resp:
+                if resp.status_code != 200:
+                    raise Exception(f"下载失败 {resp.status_code}: {await resp.aread()[:200]!r}")
+                ct = resp.headers.get("content-type", "")
+                # 不强校验,many CDNs 返 application/octet-stream
+                if ct and not ct.startswith("video/") and ct != "application/octet-stream":
+                    print(f"[minimax] warning: unexpected content-type {ct!r}")
+                with dest.open("wb") as f:
+                    async for chunk in resp.aiter_bytes(64 * 1024):
+                        f.write(chunk)
+        return str(dest)
+
+    async def generate_video_and_download(
+        self,
+        prompt: str,
+        duration: int = 6,
+        dest_path: Optional[str] = None,
+        poll_interval: int = 5,
+        poll_max_wait: int = 600,
+    ) -> Dict[str, Any]:
+        """一站式: 提交 → 轮询 → 下载 → 落盘。返回 dict,任何错误都带 `is_mock=True`。
+
+        成功时:`{job_id, status="ready", local_path, video_url, is_mock=False, model}`
+        失败时:`{is_mock=True, error="...", job_id=None}`
+        """
+        from app.core.config import settings
+
+        try:
+            job_id = await self.generate_video(prompt, duration=duration)
+        except Exception as e:
+            return {"is_mock": True, "error": f"submit failed: {e}"}
+
+        final = await self.poll_video(
+            job_id, max_wait=poll_max_wait, interval=poll_interval
+        )
+        video_url = final.get("video_url")
+        status = (final.get("status") or "").lower()
+        if not video_url or status not in ("success", "finished", "completed", "succeeded"):
+            return {
+                "is_mock": True,
+                "error": f"video not ready: status={status!r}, video_url={video_url!r}",
+                "job_id": job_id,
+            }
+
+        # 落盘路径
+        if not dest_path:
+            safe_id = "".join(c for c in job_id if c.isalnum() or c in "-_")[:32]
+            dest_path = str(Path(settings.VIDEOS_DIR) / f"{safe_id}.mp4")
+
+        try:
+            local_path = await self.download_video(video_url, dest_path)
+        except Exception as e:
+            return {
+                "is_mock": True,
+                "error": f"download failed: {e}",
+                "job_id": job_id,
+                "video_url": video_url,
+            }
+
+        return {
+            "is_mock": False,
+            "job_id": job_id,
+            "status": "ready",
+            "video_url": video_url,
+            "local_path": local_path,
+            "model": "MiniMax-Hailuo-03",
         }
 
     # ============ 播客脚本生成 ============

@@ -15,6 +15,13 @@ class ContentBase(BaseModel):
     body: str = Field(..., min_length=0)
     tags: List[str] = []
     platform: str = Field("all", description="目标平台: douyin/xiaohongshu/bilibili/toutiao/wechat/youtube/all")
+    # Phase 2: 媒体引用(视频 / 图片)
+    media_urls: List[str] = Field(default_factory=list, description="通用媒体 URL 列表")
+    video_id: Optional[str] = Field(default=None, description="关联 store.videos.id")
+    video_url: Optional[str] = Field(default=None, description="冗余存储的视频 URL")
+    video_duration: Optional[int] = Field(default=None, description="视频秒数")
+    thumbnail_url: Optional[str] = Field(default=None, description="封面/缩略图 URL")
+    image_id: Optional[str] = Field(default=None, description="关联 store.images.id(封面图)")
 
 
 class ContentCreate(ContentBase):
@@ -26,7 +33,14 @@ class ContentUpdate(BaseModel):
     body: Optional[str] = None
     tags: Optional[List[str]] = None
     platform: Optional[str] = None
-    status: Optional[str] = Field(None, description="draft/pending/published/failed")
+    status: Optional[str] = Field(None, description="draft/pending/published/failed/uploading")
+    # Phase 2 媒体字段
+    media_urls: Optional[List[str]] = None
+    video_id: Optional[str] = None
+    video_url: Optional[str] = None
+    video_duration: Optional[int] = None
+    thumbnail_url: Optional[str] = None
+    image_id: Optional[str] = None
 
 
 class ContentResponse(ContentBase):
@@ -43,7 +57,7 @@ class ContentListResponse(BaseModel):
     limit: int
 
 
-VALID_STATUSES = {"draft", "pending", "published", "failed", "archived"}
+VALID_STATUSES = {"draft", "pending", "published", "failed", "archived", "uploading"}
 VALID_PLATFORMS = {"douyin", "xiaohongshu", "bilibili", "toutiao", "wechat", "youtube", "all"}
 
 

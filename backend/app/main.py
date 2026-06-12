@@ -1,4 +1,5 @@
 # FastAPI 应用入口
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -21,6 +22,10 @@ from app.services.scheduler_loop import scheduler_loop
 async def lifespan(app: FastAPI):
     # 启动时
     print("🚀 Self-Media Platform 启动中...")
+    # Phase 2: 确保视频 / cookie 目录存在
+    Path(settings.STORAGE_DIR).mkdir(parents=True, exist_ok=True)
+    Path(settings.VIDEOS_DIR).mkdir(parents=True, exist_ok=True)
+    Path(settings.COOKIES_DIR).mkdir(parents=True, exist_ok=True)
     # 初始化默认模板
     templates_api.init_default_templates()
     # 启动后台调度循环

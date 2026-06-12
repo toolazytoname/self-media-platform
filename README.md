@@ -2,6 +2,69 @@
 
 一个基于 AI 的自媒体内容创作与多平台分发管理系统。
 
+## 🚀 Phase 2 视频生成 + 多平台分发(NEW)
+
+### 架构
+
+```
+AI 文字 → MiniMax-Hailuo-03 → .mp4 落盘
+                                   ↓
+                       抖音 douyin 平台账号 + cookie
+                                   ↓
+                          `sau douyin upload-video`
+                          (social-auto-upload + patchright Chromium)
+                                   ↓
+                            发布记录 + 状态回流
+```
+
+### 一次性环境准备
+
+```bash
+# 1. 在部署机器上(同 atelier-smp VM 即可)装 social-auto-upload
+pipx install social-auto-upload
+
+# 2. 第一次登录抖音(扫码,30 秒,cookie 落盘到 ~/.local/share/sau/douyin/)
+sau douyin login --account default
+
+# 3. 把 cookie 复制到本项目期望的位置(默认路径由 settings.COOKIES_DIR 决定)
+mkdir -p backend/storage/cookies
+cp ~/.local/share/sau/douyin/default.json backend/storage/cookies/default.json
+
+# 4. 在 backend/.env 配真实的 MiniMax API key(否则 video gen 走 mock)
+echo "MINIMAX_API_KEY=your_real_key" >> backend/.env
+```
+
+### 跑通路径
+
+1. 登录 web: `cd frontend && pnpm dev`
+2. 打开 AI tab → 视频子 tab → 填 prompt → 点 "生成视频"
+3. 切到 "发布记录" → "发布视频" → 选内容 + 视频 + 抖音 + 账号 → 立即发布
+4. 看到 dispatch 结果;失败的话看 error_message 排
+
+### Mock / 降级
+
+- 没装 `sau`:`GET /api/platforms/sau-status` 返 `sau_installed: false`
+- 没 `MINIMAX_API_KEY` 或 API 返 5xx:视频落 `storage/videos/{vid}.mp4.mock`,`is_mock=true`,前端不播放
+- mock 视频尝试发布:dispatch 直接拒(不让浪费 sau 调用)
+
+### 代码结构
+
+```
+backend/app/
+├── platforms/
+│   ├── base.py            # 抽象基类
+│   ├── douyin.py          # 抖音 adapter(subprocess wrapper)
+│   └── __init__.py        # 工厂 get_adapter()
+├── services/
+│   ├── minimax_client.py  # + poll_video / download_video / generate_video_and_download
+│   └── scheduler_loop.py  # 真派发,替代 stub
+├── api/
+│   ├── ai_generate.py     # + VideoRecord / video/list / video/{id} / video/{id}
+│   ├── platforms.py       # + publish-now / sau-status / cookie_path 字段
+│   └── content.py         # + media_urls / video_id / video_url / video_duration
+└── store.py               # + videos / get_account / update_account / 扩展 publish_record
+```
+
 ## 📁 项目结构
 
 ```

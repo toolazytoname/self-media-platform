@@ -30,6 +30,8 @@ class Store:
         self.templates: List[Dict[str, Any]] = []
         # AIGC 图片 (image gen)
         self.images: List[Dict[str, Any]] = []
+        # AIGC 视频 (video gen) — Phase 2
+        self.videos: List[Dict[str, Any]] = []
 
     # ============ AIGC Images ============
     def add_image(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -53,6 +55,30 @@ class Store:
                 self.images.pop(i)
                 return True
         return False
+
+    # ============ AIGC Videos (Phase 2) ============
+    def add_video(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        item["id"] = item.get("id") or f"vid_{uuid.uuid4().hex[:10]}"
+        item.setdefault("created_at", datetime.now().isoformat())
+        self.videos.append(item)
+        return item
+
+    def list_videos(self, limit: int = 50) -> List[Dict[str, Any]]:
+        return list(reversed(self.videos[-limit:]))
+
+    def get_video(self, video_id: str) -> Dict[str, Any] | None:
+        for v in self.videos:
+            if v.get("id") == video_id:
+                return v
+        return None
+
+    def delete_video(self, video_id: str) -> bool:
+        """删除记录,返回被删的 video 完整 dict(便于 caller 清理磁盘文件)。"""
+        for i, v in enumerate(self.videos):
+            if v.get("id") == video_id:
+                removed = self.videos.pop(i)
+                return removed
+        return None
 
     # ============ Users ============
     def add_user(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -259,6 +285,23 @@ class Store:
     def list_accounts(self) -> List[Dict[str, Any]]:
         return list(self.platform_accounts)
 
+    def get_account(self, account_id: str) -> Dict[str, Any] | None:
+        """Phase 2: 给 scheduler 查 credentials 用。"""
+        for a in self.platform_accounts:
+            if a.get("id") == account_id:
+                return a
+        return None
+
+    def update_account(self, account_id: str, update: Dict[str, Any]) -> Dict[str, Any] | None:
+        """Phase 2: 替换 PUT /platforms/accounts/{id} 原本手写的 in-place 逻辑。"""
+        for a in self.platform_accounts:
+            if a.get("id") == account_id:
+                for k, v in update.items():
+                    if v is not None:
+                        a[k] = v
+                return a
+        return None
+
     def delete_account(self, account_id: str) -> bool:
         for i, a in enumerate(self.platform_accounts):
             if a.get("id") == account_id:
@@ -271,6 +314,13 @@ class Store:
         item["publish_id"] = item.get("publish_id") or str(uuid.uuid4())
         item.setdefault("status", "pending")
         item.setdefault("created_at", datetime.now().isoformat())
+        # Phase 2 扩展字段:由 adapter 写入
+        item.setdefault("platform_publish_id", None)  # 平台侧返回的 ID / URL
+        item.setdefault("url", None)                  # 平台侧发布后的公开 URL
+        item.setdefault("error_message", None)        # 失败时的原因
+        item.setdefault("attempted_at", None)         # 上次尝试时间
+        item.setdefault("video_id", None)             # 关联的视频记录 id
+        item.setdefault("account_id", None)           # 关联的平台账号 id
         self.publish_records.append(item)
         return item
 
@@ -298,6 +348,11 @@ class Store:
     def add_scheduled_task(self, item: Dict[str, Any]) -> Dict[str, Any]:
         item["id"] = item.get("id") or str(uuid.uuid4())
         item.setdefault("status", "pending")
+        # Phase 2 扩展字段
+        item.setdefault("attempt_count", 0)    # 已尝试次数,scheduler 用
+        item.setdefault("account_id", None)   # 关联平台账号
+        item.setdefault("video_id", None)     # 关联视频记录
+        item.setdefault("error_message", None) # 上次失败的错误
         self.scheduled_tasks.append(item)
         return item
 

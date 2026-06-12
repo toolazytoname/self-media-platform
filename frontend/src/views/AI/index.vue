@@ -246,24 +246,76 @@
         </template>
         <section class="ds-card ai-tab-card">
           <h2 class="ds-card__title">文字转视频</h2>
-          <p class="ds-card__lede">MiniMax-Video 模型（每日 3 次额度）。</p>
+          <p class="ds-card__lede">MiniMax-Hailuo-03 模型（每日 3 次额度，3/6/10s 可选）。</p>
           <el-form :model="forms.video" label-position="top">
             <el-form-item label="视频描述">
               <el-input v-model="forms.video.prompt" type="textarea" :rows="3"
                        placeholder="例如：航拍镜头飞越山谷日落" />
             </el-form-item>
+            <el-form-item label="时长与比例">
+              <div class="row-pair">
+                <el-select v-model="forms.video.duration" style="width: 110px">
+                  <el-option v-for="d in DURATION_OPTIONS" :key="d" :label="`${d} 秒`" :value="d" />
+                </el-select>
+                <el-select v-model="forms.video.ratio" style="width: 130px">
+                  <el-option v-for="r in RATIO_OPTIONS" :key="r.value" :label="r.label" :value="r.value" />
+                </el-select>
+                <el-input v-model="forms.video.style" placeholder="风格(可选,如 写实摄影)" style="flex: 1" />
+              </div>
+            </el-form-item>
             <el-form-item>
               <el-button class="primary-cta" :loading="loading.video" :disabled="!forms.video.prompt" @click="genVideo">
-                {{ loading.video ? '提交中…' : '生成视频' }}
+                {{ loading.video ? '生成并下载中…' : '生成视频' }}
               </el-button>
             </el-form-item>
-            <div v-if="results.video" class="result-block">
-              <p class="mono">任务 ID: {{ results.video.job_id }}</p>
-              <p>状态: <span class="ds-pill ds-pill--warning">{{ results.video.status }}</span></p>
-              <el-button size="small" :disabled="!results.video.job_id" @click="checkVideoStatus">刷新状态</el-button>
-              <video v-if="results.video.video_url" :src="results.video.video_url" controls class="generated-video"></video>
+            <el-alert v-if="videoResult?.is_mock" type="warning" :closable="false" show-icon
+                       :title="`Mock 模式:${videoResult.error || 'API key 未配置,使用占位文件'}`" />
+            <div v-if="videoResult" class="result-block">
+              <div class="result-meta">
+                <span class="ds-pill" :class="`ds-pill--${videoResult.is_mock ? 'neutral' : 'success'}`">
+                  {{ videoResult.is_mock ? 'MOCK' : 'REAL' }}
+                </span>
+                <span class="ds-pill" :class="`ds-pill--${videoResult.record.status === 'ready' ? 'success' : 'warning'}`">
+                  {{ videoResult.record.status }}
+                </span>
+                <span class="caption mono">{{ videoResult.record.id }}</span>
+              </div>
+              <video v-if="!videoResult.is_mock && videoResult.record.video_url"
+                     :src="videoResult.record.video_url" controls class="generated-video" />
+              <p v-else class="caption">占位文件: {{ videoResult.record.local_path || '无' }}</p>
+              <div class="result-actions">
+                <el-button size="small" :disabled="!videoResult.is_mock" @click="goPublishRecords(videoResult.record.id)">
+                  去发布
+                </el-button>
+                <el-button size="small" plain @click="videoResult = null">清除</el-button>
+              </div>
             </div>
           </el-form>
+
+          <!-- 视频历史 -->
+          <div class="video-history" v-if="videoHistory.length > 0">
+            <h3 class="ds-section-head">历史视频 ({{ videoHistory.length }})</h3>
+            <div class="video-grid">
+              <article v-for="v in videoHistory" :key="v.id" class="video-card">
+                <div class="video-card-head">
+                  <span class="ds-pill" :class="`ds-pill--${v.is_mock ? 'neutral' : 'success'}`">
+                    {{ v.is_mock ? 'MOCK' : 'REAL' }}
+                  </span>
+                  <span class="ds-pill" :class="`ds-pill--${v.status === 'ready' ? 'success' : 'warning'}`">
+                    {{ v.status }}
+                  </span>
+                </div>
+                <div class="video-card-body">
+                  <p class="video-prompt">{{ v.prompt.slice(0, 60) }}{{ v.prompt.length > 60 ? '…' : '' }}</p>
+                  <p class="caption">{{ v.duration }}s · {{ v.ratio }} · {{ formatTime(v.created_at) }}</p>
+                </div>
+                <div class="video-card-actions">
+                  <el-button size="small" :disabled="v.is_mock" @click="goPublishRecords(v.id)">发布</el-button>
+                  <el-button size="small" plain @click="deleteVideo(v.id)">删除</el-button>
+                </div>
+              </article>
+            </div>
+          </div>
         </section>
       </el-tab-pane>
     </el-tabs>
@@ -271,12 +323,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { aiApi } from '@/api/ai'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { aiApi, type VideoRecord, type VideoGenerateResponse } from '@/api/ai'
 import { settingsApi } from '@/api/settings'
 import { PLATFORM_OPTIONS, getPlatformName } from '@/constants'
 
+const router = useRouter()
 const activeTab = ref('summary')
 const loading = reactive({ summary: false, podcast: false, copy: false, videoScript: false, image: false, video: false })
 const forms = reactive({
@@ -285,11 +339,21 @@ const forms = reactive({
   copy: { topic: '', platform: 'douyin' },
   videoScript: { topic: '', duration: 60 },
   image: { prompt: '', style: '写实摄影', ratio: '1:1', n: 1 },
-  video: { prompt: '' },
+  video: { prompt: '', duration: 6, ratio: '16:9', style: '' },
 })
 const results = reactive<any>({})
 const imageHistory = ref<any[]>([])
+const videoHistory = ref<VideoRecord[]>([])
+const videoResult = ref<VideoGenerateResponse | null>(null)
 const lastMockCount = ref(0)
+
+// 视频表单的常量
+const DURATION_OPTIONS = [3, 6, 10]
+const RATIO_OPTIONS = [
+  { value: '16:9', label: '16:9 横屏 (MiniMax 原生)' },
+  { value: '9:16', label: '9:16 竖屏 (抖音推荐)' },
+  { value: '1:1', label: '1:1 方形' },
+]
 
 const formatTime = (iso: string) => {
   if (!iso) return ''
@@ -372,20 +436,54 @@ const genImage = async () => {
 const genVideo = async () => {
   loading.video = true
   try {
-    results.video = await aiApi.videoGenerate(forms.video.prompt)
-    if (results.video?.job_id) ElMessage.success(`任务已提交：${results.video.job_id}`)
-  } catch (e: any) { handleError(e, '视频生成') }
-  finally { loading.video = false }
+    const resp = await aiApi.videoGenerate({
+      prompt: forms.video.prompt,
+      duration: forms.video.duration,
+      ratio: forms.video.ratio,
+      style: forms.video.style || undefined,
+    })
+    videoResult.value = resp
+    if (resp.is_mock) {
+      ElMessage.warning(`已用 mock 模式:${resp.error || 'API key 未配置'}`)
+    } else {
+      ElMessage.success(`已生成视频 (${resp.record.duration}s)`)
+    }
+    await loadVideoHistory()
+  } catch (e: unknown) {
+    handleError(e, '视频生成')
+  } finally {
+    loading.video = false
+  }
 }
 
-const checkVideoStatus = async () => {
-  if (!results.video?.job_id) return
+const loadVideoHistory = async () => {
   try {
-    const status = await aiApi.videoStatus(results.video.job_id)
-    results.video = { ...results.video, ...status }
-    if (status.video_url) ElMessage.success('视频生成完成')
-  } catch (e: any) { handleError(e, '查询视频状态') }
+    const list = await aiApi.videoList(50)
+    videoHistory.value = list.items || []
+  } catch (_) { /* silent */ }
 }
+
+const deleteVideo = async (id: string) => {
+  try {
+    await ElMessageBox.confirm('删除该视频记录?(磁盘占位文件也会被清理)', '确认', { type: 'warning' })
+  } catch { return }
+  try {
+    await aiApi.videoDelete(id)
+    videoHistory.value = videoHistory.value.filter(v => v.id !== id)
+    ElMessage.success('已删除')
+  } catch (e: unknown) {
+    handleError(e, '删除视频')
+  }
+}
+
+const goPublishRecords = (videoId: string) => {
+  router.push({ path: '/publish-records', query: { video_id: videoId } })
+}
+
+// 切到 video tab 时拉历史(避免每次 mount 都打)
+watch(activeTab, (tab) => {
+  if (tab === 'video') loadVideoHistory()
+})
 
 onMounted(async () => {
   checkConfigured()
@@ -414,6 +512,24 @@ onMounted(async () => {
 .primary-cta:hover { background: var(--claude-coral) !important; }
 
 .generated-video { max-width: 100%; border-radius: var(--radius-lg); margin-top: 12px; }
+
+.row-pair { display: flex; gap: 8px; align-items: center; }
+.video-history { margin-top: 32px; border-top: 1px solid var(--claude-border-cream); padding-top: 24px; }
+.video-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px; margin-top: 12px;
+}
+.video-card {
+  border: 1px solid var(--claude-border-cream);
+  background: var(--claude-parchment);
+  border-radius: var(--radius-lg);
+  padding: 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.video-card-head, .video-card-actions { display: flex; gap: 6px; align-items: center; }
+.video-card-body { flex: 1; }
+.video-prompt { font-size: 13px; line-height: 1.4; color: var(--claude-text-primary); margin: 0 0 6px; }
+.result-meta { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.result-actions { display: flex; gap: 8px; margin-top: 8px; }
 
 @media (max-width: 640px) { }
 .gen-btn {

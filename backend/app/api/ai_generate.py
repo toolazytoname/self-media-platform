@@ -1,9 +1,10 @@
 # AI 生成 API - 使用 MiniMaxClient
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 import asyncio
+from pathlib import Path
 
 router = APIRouter()
 
@@ -60,6 +61,49 @@ class ImageRecord(BaseModel):
 class ImageListResponse(BaseModel):
     total: int
     items: List[ImageRecord]
+
+
+# ---- Phase 2: 视频生成 ----
+
+class VideoGenerateRequest(BaseModel):
+    prompt: str
+    duration: int = Field(default=6, description="视频秒数,3 / 6 / 10")
+    ratio: Optional[str] = Field(default="16:9", description="16:9 / 9:16 / 1:1")
+    style: Optional[str] = None
+    image_url: Optional[str] = Field(default=None, description="(可选) 图生视频参考图")
+    auto_poll: bool = Field(default=True, description="True=服务端轮询后返回 video;False=立即返回 job_id")
+    timeout_seconds: int = Field(default=600, description="auto_poll 总超时(秒)")
+
+    @field_validator("duration")
+    @classmethod
+    def _check_duration(cls, v: int) -> int:
+        from app.services.minimax_client import DOUYIN_DURATION_OPTIONS
+        if v not in DOUYIN_DURATION_OPTIONS:
+            raise ValueError(
+                f"duration 必须是 {DOUYIN_DURATION_OPTIONS} 之一,收到 {v}"
+            )
+        return v
+
+
+class VideoRecord(BaseModel):
+    id: str
+    prompt: str
+    duration: int = 6
+    ratio: str = "16:9"
+    style: Optional[str] = None
+    job_id: Optional[str] = None
+    status: str = "generating"          # generating | ready | failed
+    local_path: Optional[str] = None    # 落盘路径
+    video_url: Optional[str] = None     # 平台侧 URL
+    is_mock: bool = False               # 关键:是占位 mock 还是真生成
+    model: str = "MiniMax-Hailuo-03"
+    error: Optional[str] = None
+    created_at: str
+
+
+class VideoListResponse(BaseModel):
+    total: int
+    items: List[VideoRecord]
 
 
 # ============ 路由 ============
@@ -224,22 +268,120 @@ async def delete_image(image_id: str) -> Dict[str, Any]:
 
 
 @router.post("/video/generate")
-async def generate_video(req: ImageGenerateRequest) -> Dict[str, Any]:
-    """视频生成（限额3条/日）"""
+async def generate_video(req: VideoGenerateRequest) -> Dict[str, Any]:
+    """视频生成 — auto_poll 模式下服务端轮询+落盘,失败时降级 mock。"""
+    from app.core.config import settings
+    from app.services.minimax_client import DOUYIN_DURATION_OPTIONS, MiniMaxClient
+    from app.store import store
+
+    # 1) 提交 + 轮询 + 下载(orchestrator 内部已经包含 mock fallback)
+    is_mock = True
+    video_url: Optional[str] = None
+    local_path: Optional[str] = None
+    job_id: Optional[str] = None
+    error_msg: Optional[str] = None
+    model = "MiniMax-Hailuo-03"
+
     try:
-        from app.services.minimax_client import MiniMaxClient
         client = MiniMaxClient()
-        job_id = await client.generate_video(req.prompt)
-        return {"job_id": job_id, "status": "pending"}
+        result = await client.generate_video_and_download(
+            prompt=req.prompt,
+            duration=req.duration,
+            poll_max_wait=req.timeout_seconds,
+        )
+        is_mock = result.get("is_mock", True)
+        job_id = result.get("job_id")
+        video_url = result.get("video_url")
+        local_path = result.get("local_path")
+        error_msg = result.get("error")
+        if not is_mock and req.duration not in DOUYIN_DURATION_OPTIONS:
+            # 客户端传错 duration 也允许,但记录提示
+            error_msg = (
+                f"duration {req.duration} 超出官方支持 {DOUYIN_DURATION_OPTIONS},仍按服务返回处理"
+            )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # 没配 API key — 走 mock 占位
+        error_msg = f"API key 未配置: {e}"
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = f"{type(e).__name__}: {e}"
+
+    # 2) mock 兜底:写一个 0 字节占位文件,is_mock=True,前端不会真正播放
+    if is_mock:
+        from app.core.config import settings as _s
+        # 用 prompt + 时间戳生成稳定的 mock id
+        import hashlib, time
+        mock_id_seed = req.prompt + str(time.time_ns())
+        mock_id = "vid_" + hashlib.md5(mock_id_seed.encode()).hexdigest()[:10]
+        placeholder = Path(_s.VIDEOS_DIR) / f"{mock_id}.mp4.mock"
+        placeholder.parent.mkdir(parents=True, exist_ok=True)
+        placeholder.write_text("MOCK VIDEO - replace sau cookie + real MiniMax key to enable real generation\n")
+        local_path = str(placeholder)
+        # 也写一个 video_url 指向 picsum video 占位(如果有)
+        if not video_url:
+            seed = hashlib.md5(req.prompt.encode()).hexdigest()[:8]
+            # picsum 不支持视频,用 placeholder gif
+            video_url = f"https://picsum.photos/seed/{seed}/640/360.jpg"
+
+    # 3) 落库 — 一旦落到 store (有 local_path),就标 ready;error 字段承载 mock 原因
+    rec = store.add_video({
+        "prompt": req.prompt,
+        "duration": req.duration,
+        "ratio": req.ratio or "16:9",
+        "style": req.style,
+        "job_id": job_id,
+        # mock placeholder 仍然是可交付物;真失败且无 mock 才标 failed
+        "status": "ready" if local_path else "failed",
+        "local_path": local_path,
+        "video_url": video_url,
+        "is_mock": is_mock,
+        "model": model,
+        "error": error_msg,
+    })
+
+    return {
+        "record": rec,
+        "is_mock": is_mock,
+        "error": error_msg,
+    }
+
+
+@router.get("/video/list")
+async def list_videos(limit: int = 50) -> VideoListResponse:
+    """列出最近生成的视频"""
+    from app.store import store
+    items = store.list_videos(limit=limit)
+    return VideoListResponse(total=len(items), items=items)
+
+
+@router.get("/video/{video_id}")
+async def get_video(video_id: str) -> VideoRecord:
+    """获取单条视频详情"""
+    from app.store import store
+    rec = store.get_video(video_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Video not found")
+    return rec
+
+
+@router.delete("/video/{video_id}")
+async def delete_video(video_id: str) -> Dict[str, Any]:
+    """删除视频记录 + 清理落盘文件"""
+    from app.store import store
+    rec = store.delete_video(video_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Video not found")
+    # 删磁盘文件
+    if rec.get("local_path"):
+        try:
+            Path(rec["local_path"]).unlink(missing_ok=True)
+        except Exception as e:
+            print(f"[video] warning: failed to remove {rec['local_path']}: {e}")
+    return {"ok": True, "id": video_id}
 
 
 @router.get("/video/status/{job_id}")
 async def get_video_status(job_id: str) -> Dict[str, Any]:
-    """获取视频生成状态"""
+    """获取视频生成状态(保留旧端点,用于 auto_poll=False 的客户端轮询)"""
     try:
         from app.services.minimax_client import MiniMaxClient
         client = MiniMaxClient()

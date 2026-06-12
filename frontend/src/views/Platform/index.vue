@@ -74,6 +74,9 @@
         <el-form-item label="说明">
           <el-input v-model="form.description" type="textarea" :rows="2" placeholder="账号说明..." />
         </el-form-item>
+        <el-form-item label="Cookie 路径(Phase 2,可选)">
+          <el-input v-model="form.cookie_path" placeholder="留空则默认 storage/cookies/{name}.json" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
@@ -96,7 +99,7 @@ const loading = ref(false)
 const saving = ref(false)
 const showDialog = ref(false)
 const isEdit = ref(false)
-const form = ref({ id: '', platform: '', name: '', account_id: '', description: '' })
+const form = ref({ id: '', platform: '', name: '', account_id: '', description: '', cookie_path: '' })
 
 const loadList = async () => {
   loading.value = true
@@ -107,7 +110,7 @@ const loadList = async () => {
 
 const openCreate = () => {
   isEdit.value = false
-  form.value = { id: '', platform: '', name: '', account_id: '', description: '' }
+  form.value = { id: '', platform: '', name: '', account_id: '', description: '', cookie_path: '' }
   showDialog.value = true
 }
 
@@ -116,6 +119,7 @@ const openEdit = (a: PlatformAccount) => {
   form.value = {
     id: a.id, platform: a.platform, name: a.name,
     account_id: a.account_id || '', description: a.description || '',
+    cookie_path: a.cookie_path || '',
   }
   showDialog.value = true
 }

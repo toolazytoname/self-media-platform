@@ -41,11 +41,37 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
+    # ===== Phase 2: 视频生成 / 多平台分发 存储 =====
+    # 根目录(在 .gitignore 里,运行时自动建)
+    STORAGE_DIR: str = "./storage"
+    # 生成的视频文件落盘位置
+    VIDEOS_DIR: str = ""  # 空时 = STORAGE_DIR/videos
+    # 抖音 cookie(由 `sau douyin login` 写入)
+    COOKIES_DIR: str = ""  # 空时 = STORAGE_DIR/cookies
+
+    # Phase 2: social-auto-upload CLI 集成
+    # `sau` 二进制路径;默认从 PATH 找
+    DOUYIN_SAU_BIN: str = "sau"
+    # 默认抖音账号名(cookie_path = COOKIES_DIR/{name}.json)
+    DOUYIN_DEFAULT_ACCOUNT: str = "default"
+
+    # Phase 2: 视频生成超时/轮询
+    SCHEDULER_VIDEO_TIMEOUT_SECONDS: int = 600
+    VIDEO_POLL_INTERVAL_SECONDS: int = 5
+    VIDEO_POLL_MAX_WAIT_SECONDS: int = 600
+
     class Config:
         # .env 路径: backend/.env
         env_file = str(ENV_FILE) if ENV_FILE.exists() else None
         env_file_encoding = "utf-8"
         extra = "allow"
+
+    def model_post_init(self, __context):
+        """将 VIDEOS_DIR / COOKIES_DIR 在空时自动派生为 STORAGE_DIR 的子目录。"""
+        if not self.VIDEOS_DIR:
+            self.VIDEOS_DIR = str(Path(self.STORAGE_DIR) / "videos")
+        if not self.COOKIES_DIR:
+            self.COOKIES_DIR = str(Path(self.STORAGE_DIR) / "cookies")
 
 
 settings = Settings()
