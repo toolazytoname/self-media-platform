@@ -20,9 +20,20 @@ class Settings(BaseSettings):
     # MiniMax API
     MINIMAX_API_KEY: Optional[str] = None
     MINIMAX_BASE_URL: str = "https://api.minimaxi.com/v1"
+    MINIMAX_MODEL: str = "MiniMax-M3"
 
     # OpenAI 备选
     OPENAI_API_KEY: Optional[str] = None
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_MODEL: str = "gpt-4o-mini"
+
+    # Claude (Anthropic)
+    CLAUDE_API_KEY: Optional[str] = None
+    CLAUDE_BASE_URL: str = "https://api.anthropic.com"
+    CLAUDE_MODEL: str = "claude-haiku-4-5"
+
+    # Phase A: 默认 AI provider("minimax" / "claude" / "openai")
+    DEFAULT_AI_PROVIDER: str = "minimax"
 
     # 数据库
     DATABASE_URL: str = "postgresql://localhost:5432/selfmedia"

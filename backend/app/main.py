@@ -16,12 +16,21 @@ from app.api import (
 )
 from app.core.config import settings
 from app.services.scheduler_loop import scheduler_loop
+from app.services.ai_providers import register_provider
+from app.services.ai_providers.minimax_provider import MiniMaxProvider
+from app.services.ai_providers.claude_provider import ClaudeProvider
+from app.services.ai_providers.openai_provider import OpenAIProvider
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动时
     print("🚀 Self-Media Platform 启动中...")
+    # Phase A: 注册 AI providers
+    register_provider("minimax", MiniMaxProvider)
+    register_provider("claude", ClaudeProvider)
+    register_provider("openai", OpenAIProvider)
+    print(f"   AI providers: minimax / claude / openai (default: {settings.DEFAULT_AI_PROVIDER})")
     # Phase 2: 确保视频 / cookie 目录存在
     Path(settings.STORAGE_DIR).mkdir(parents=True, exist_ok=True)
     Path(settings.VIDEOS_DIR).mkdir(parents=True, exist_ok=True)

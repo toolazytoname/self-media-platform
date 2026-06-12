@@ -13,7 +13,12 @@
     <section class="ds-card editor-form">
       <el-form :model="form" label-position="top" v-loading="loading">
         <el-form-item label="标题" required>
-          <el-input v-model="form.title" placeholder="输入有吸引力的标题" size="large" maxlength="200" show-word-limit />
+          <div class="field-with-ai">
+            <el-input v-model="form.title" placeholder="输入有吸引力的标题" size="large" maxlength="200" show-word-limit />
+            <el-button class="ai-btn" :disabled="!form.body" @click="openAiDialog('title')" title="AI 生成标题">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l1.5 4 4 1.5-4 1.5L8 12l-1.5-4-4-1.5 4-1.5z" stroke-linejoin="round" fill="currentColor" opacity="0.3" /><path d="M13 9l.7 1.8 1.8.7-1.8.7L13 14l-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor" /></svg>
+            </el-button>
+          </div>
         </el-form-item>
 
         <el-form-item label="内容" required>
@@ -49,14 +54,34 @@
               </div>
             </el-tab-pane>
           </el-tabs>
+          <!-- AI 助手按钮组(Phase C.3) -->
+          <div class="ai-assist-row">
+            <el-button class="ai-btn" :disabled="!form.body" @click="openAiDialog('expand')" size="small">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l-2 2 2 2M12 4l2 2-2 2M4 12l-2-2 2-2M12 12l2-2-2-2M5 8h6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              扩写
+            </el-button>
+            <el-button class="ai-btn" :disabled="!form.body" @click="openAiDialog('summary')" size="small">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10M3 6h10M3 9h7M3 12h4" stroke-linecap="round" /></svg>
+              摘要
+            </el-button>
+            <el-button class="ai-btn" :disabled="!form.body" @click="openAiDialog('copy')" size="small">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5h12v8H2z M5 8h6" stroke-linecap="round" /></svg>
+              改写文案
+            </el-button>
+          </div>
         </el-form-item>
 
         <div class="two-col">
           <el-form-item label="标签">
-            <el-select v-model="form.tags" multiple filterable allow-create default-first-option
-                       placeholder="选择或输入新标签，回车确认" style="width: 100%">
-              <el-option v-for="t in TAG_PRESETS" :key="t.value" :label="t.label" :value="t.value" />
-            </el-select>
+            <div class="field-with-ai">
+              <el-select v-model="form.tags" multiple filterable allow-create default-first-option
+                         placeholder="选择或输入新标签，回车确认" style="width: 100%">
+                <el-option v-for="t in TAG_PRESETS" :key="t.value" :label="t.label" :value="t.value" />
+              </el-select>
+              <el-button class="ai-btn" :disabled="!form.body" @click="openAiDialog('tags')" title="AI 提取标签">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h4l6 6-4 4-6-6V3z" stroke-linejoin="round" /></svg>
+              </el-button>
+            </div>
           </el-form-item>
           <el-form-item label="目标平台">
             <el-select v-model="form.platform" placeholder="选择平台" style="width: 100%">
@@ -76,17 +101,81 @@
         </div>
       </el-form>
     </section>
+
+    <!-- ============ AI 助手弹窗(Phase C.3) ============ -->
+    <el-dialog
+      v-model="aiDialog.show"
+      :title="`AI 助手 · ${aiDialogTitle(aiDialog.module)}`"
+      width="640"
+    >
+      <div v-if="aiDialog.module === 'tags'" class="ai-dialog-body">
+        <p class="caption">基于当前正文提取 {{ aiDialog.tagsN }} 个标签,选{{ '{' }}locale{{ '}' }} {{ aiDialog.tagsLocale }}</p>
+      </div>
+      <div v-else-if="aiDialog.module === 'expand'" class="ai-dialog-body">
+        <p class="caption">目标长度 {{ aiDialog.expandLength }}, 语气 {{ aiDialog.expandTone }}</p>
+      </div>
+      <div v-else-if="aiDialog.module === 'copy'" class="ai-dialog-body">
+        <p class="caption">目标平台 {{ aiDialog.copyPlatform }}</p>
+      </div>
+      <div v-else class="ai-dialog-body">
+        <p class="caption">基于当前正文生成</p>
+      </div>
+
+      <el-input
+        v-model="aiDialog.input"
+        type="textarea"
+        :rows="6"
+        :placeholder="aiDialogPlaceholder"
+      />
+
+      <div v-if="aiDialog.result" class="ai-result">
+        <pre v-if="aiDialog.module !== 'tags' && aiDialog.module !== 'titles'">{{ aiDialog.result }}</pre>
+        <div v-else-if="aiDialog.module === 'tags'" class="ai-tag-pills">
+          <el-tag v-for="(t, i) in aiDialog.parsedTags" :key="i" effect="light" style="margin: 4px">
+            <span class="caption">[{{ t.group }}]</span> {{ t.text }}
+          </el-tag>
+        </div>
+        <div v-else-if="aiDialog.module === 'titles'" class="ai-titles">
+          <div v-for="(t, i) in aiDialog.parsedTitles" :key="i" class="ai-title-row">
+            <span class="ai-title-text">{{ t.text }}</span>
+            <el-button size="small" type="primary" @click="applyAiResult(t.text)">应用</el-button>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="aiDialog.show = false">关闭</el-button>
+        <el-button
+          v-if="aiDialog.module !== 'titles' && aiDialog.module !== 'tags'"
+          type="primary"
+          :loading="aiDialog.loading"
+          :disabled="!aiDialog.input"
+          @click="runAiAssist"
+        >生成</el-button>
+        <el-button
+          v-if="aiDialog.module === 'titles' && aiDialog.result"
+          type="primary"
+          @click="aiDialog.show = false"
+        >关闭(上方点"应用"逐个采纳)</el-button>
+        <el-button
+          v-if="aiDialog.module === 'tags' && aiDialog.result"
+          type="primary"
+          @click="applyTagsToForm"
+        >全部应用到标签字段</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
 import { contentApi, type Content } from '@/api/content'
 import { templateApi, type Template } from '@/api/templates'
-import { TAG_PRESETS, PLATFORM_OPTIONS, CONTENT_STATUSES, getStatusMeta } from '@/constants'
+import { aiApi } from '@/api/ai'
+import { TAG_PRESETS, PLATFORM_OPTIONS, CONTENT_STATUSES, getStatusMeta, getPlatformName } from '@/constants'
 
 const route = useRoute()
 const router = useRouter()
@@ -204,12 +293,183 @@ const onSubmitReview = async () => {
   } finally { reviewing.value = false }
 }
 
+// ============ AI 助手弹窗(Phase C.3) ============
+
+interface AiDialogState {
+  show: boolean
+  module: 'title' | 'expand' | 'summary' | 'copy' | 'tags' | 'titles'
+  input: string
+  result: string
+  loading: boolean
+  // 副参数
+  expandLength: 'short' | 'medium' | 'long'
+  expandTone: 'casual' | 'formal' | 'academic'
+  copyPlatform: string
+  tagsN: number
+  tagsLocale: 'zh' | 'en' | 'emoji' | 'mixed'
+  parsedTags: { text: string; group: string }[]
+  parsedTitles: { text: string }[]
+}
+
+const aiDialog = reactive<AiDialogState>({
+  show: false,
+  module: 'expand',
+  input: '',
+  result: '',
+  loading: false,
+  expandLength: 'medium',
+  expandTone: 'casual',
+  copyPlatform: 'douyin',
+  tagsN: 10,
+  tagsLocale: 'mixed',
+  parsedTags: [],
+  parsedTitles: [],
+})
+
+const aiDialogTitle = (m: string) => ({
+  title: '生成标题', expand: '扩写', summary: '摘要', copy: '改写文案',
+  tags: '提取标签', titles: '生成多个标题',
+}[m] || m)
+
+const aiDialogPlaceholder = computed(() => {
+  // 默认把当前正文塞进 input,user 可以微调
+  return aiDialog.module === 'title' ? '可留空(用正文生成);也输入关键词' : '默认从正文取,可修改'
+})
+
+const openAiDialog = (m: AiDialogState['module']) => {
+  aiDialog.module = m
+  aiDialog.input = form.value.body || ''
+  aiDialog.result = ''
+  aiDialog.parsedTags = []
+  aiDialog.parsedTitles = []
+  // 模块默认参数
+  if (m === 'titles') aiDialog.tagsN = 5
+  if (m === 'copy') aiDialog.copyPlatform = form.value.platform !== 'all' ? form.value.platform : 'douyin'
+  aiDialog.show = true
+}
+
+const runAiAssist = async () => {
+  aiDialog.loading = true
+  try {
+    const input = aiDialog.input || form.value.body
+    if (aiDialog.module === 'expand') {
+      const r = await aiApi.expandText({
+        content: input,
+        target_length: aiDialog.expandLength,
+        tone: aiDialog.expandTone,
+      })
+      aiDialog.result = r.expanded
+    } else if (aiDialog.module === 'summary') {
+      const r = await aiApi.summary(input)
+      aiDialog.result = r.summary
+    } else if (aiDialog.module === 'copy') {
+      const r = await aiApi.copy(input, aiDialog.copyPlatform)
+      aiDialog.result = r.copy
+    } else if (aiDialog.module === 'title') {
+      const r = await aiApi.titles({ content: input, n: 5 })
+      aiDialog.parsedTitles = r.titles
+      aiDialog.result = r.titles.map(t => t.text).join('\n')
+    } else if (aiDialog.module === 'tags') {
+      const r = await aiApi.tags({ content: input, n: aiDialog.tagsN, locale: aiDialog.tagsLocale })
+      aiDialog.parsedTags = r.tags
+      aiDialog.result = r.tags.map(t => `${t.group}|${t.text}`).join('\n')
+    }
+  } catch (e: any) {
+    ElMessage.error('AI 生成失败: ' + (e.normalizedMessage || e.message))
+  } finally {
+    aiDialog.loading = false
+  }
+}
+
+const applyAiResult = (text: string) => {
+  if (aiDialog.module === 'title') {
+    form.value.title = text
+    ElMessage.success('已填入标题字段')
+  } else {
+    form.value.body = text
+    ElMessage.success('已替换正文')
+  }
+  aiDialog.show = false
+}
+
+const applyTagsToForm = () => {
+  const existing = new Set(form.value.tags)
+  for (const t of aiDialog.parsedTags) {
+    if (!existing.has(t.text)) {
+      form.value.tags.push(t.text)
+      existing.add(t.text)
+    }
+  }
+  ElMessage.success(`已添加 ${aiDialog.parsedTags.length} 个标签`)
+  aiDialog.show = false
+}
+
 onMounted(() => {
   loadTemplates()
   if (isEdit.value) loadContent(route.params.id as string)
+
+  // 处理从 AI 视图跳过来带 ?title= / ?body= / ?add_tag= 预填
+  const q = route.query
+  if (typeof q.title === 'string' && q.title) form.value.title = q.title
+  if (typeof q.body === 'string' && q.body) form.value.body = q.body
+  if (typeof q.add_tag === 'string' && q.add_tag) {
+    if (!form.value.tags.includes(q.add_tag)) form.value.tags.push(q.add_tag)
+  }
 })
 </script>
 
 <style scoped>
 @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ============ Phase C.3: AI 助手按钮 ============ */
+.field-with-ai {
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.field-with-ai > .el-input,
+.field-with-ai > .el-select { flex: 1; }
+.ai-btn {
+  background: var(--claude-parchment) !important;
+  border: 1px solid var(--claude-border-cream) !important;
+  color: var(--claude-terracotta) !important;
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 12px !important;
+}
+.ai-btn:hover {
+  background: var(--claude-terracotta) !important;
+  color: var(--claude-ivory) !important;
+  border-color: var(--claude-terracotta) !important;
+}
+.ai-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ai-assist-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-top: 12px; padding: 8px;
+  background: var(--claude-parchment);
+  border-radius: 8px;
+}
+
+/* AI 弹窗 */
+.ai-dialog-body { margin-bottom: 12px; }
+.ai-dialog-body .caption { color: var(--claude-stone); font-size: 13px; }
+.ai-result {
+  margin-top: 12px; padding: 12px;
+  background: var(--claude-parchment);
+  border-radius: 8px;
+  max-height: 280px; overflow: auto;
+}
+.ai-result pre {
+  font: inherit; font-size: 13px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; margin: 0;
+}
+.ai-tag-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.ai-titles { display: flex; flex-direction: column; gap: 6px; }
+.ai-title-row {
+  display: flex; gap: 8px; align-items: center;
+  padding: 6px 8px; background: var(--claude-ivory);
+  border-radius: 6px;
+}
+.ai-title-text { flex: 1; font-size: 14px; }
 </style>

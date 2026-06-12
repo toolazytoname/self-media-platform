@@ -1,7 +1,7 @@
 # 共享内存存储
 # 用于在多个 API 模块间共享数据。生产环境会替换为数据库。
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 import uuid
 
@@ -32,6 +32,8 @@ class Store:
         self.images: List[Dict[str, Any]] = []
         # AIGC 视频 (video gen) — Phase 2
         self.videos: List[Dict[str, Any]] = []
+        # AI 创作历史(跨模块) — Phase B.4
+        self.ai_creations: List[Dict[str, Any]] = []
 
     # ============ AIGC Images ============
     def add_image(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -79,6 +81,34 @@ class Store:
                 removed = self.videos.pop(i)
                 return removed
         return None
+
+    # ============ AI Creations (Phase B.4) ============
+    def add_ai_creation(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        item["id"] = item.get("id") or f"aic_{uuid.uuid4().hex[:10]}"
+        item.setdefault("created_at", datetime.now().isoformat())
+        self.ai_creations.append(item)
+        return item
+
+    def list_creations(
+        self, type: Optional[str] = None, limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        items = self.ai_creations
+        if type:
+            items = [c for c in items if c.get("type") == type]
+        return list(reversed(items[-limit:]))
+
+    def get_creation(self, creation_id: str) -> Dict[str, Any] | None:
+        for c in self.ai_creations:
+            if c.get("id") == creation_id:
+                return c
+        return None
+
+    def delete_creation(self, creation_id: str) -> bool:
+        for i, c in enumerate(self.ai_creations):
+            if c.get("id") == creation_id:
+                self.ai_creations.pop(i)
+                return True
+        return False
 
     # ============ Users ============
     def add_user(self, item: Dict[str, Any]) -> Dict[str, Any]:

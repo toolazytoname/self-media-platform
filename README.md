@@ -2,7 +2,51 @@
 
 一个基于 AI 的自媒体内容创作与多平台分发管理系统。
 
-## 🚀 Phase 2 视频生成 + 多平台分发(NEW)
+## 🎨 AI 创作中心(Phase A+B,多 provider)
+
+### 三家 AI provider 通用
+
+通过设置页面(`/settings`)配置,默认用 MiniMax,可以切 Claude / OpenAI:
+
+| Provider | 文本/脚本 | 图片 | 视频 | 备注 |
+|---|---|---|---|---|
+| **MiniMax**(默认) | ✅ | ✅ `image-01` | ✅ `MiniMax-Hailuo-03` (3/天) | `https://platform.minimaxi.com` |
+| **Claude** | ✅ | ❌ | ❌ | `claude-haiku-4-5` / `claude-sonnet-4-6` / `claude-opus-4-8` |
+| **OpenAI** 兼容 | ✅ | ❌ | ❌ | 也支持 Ollama / vLLM / Together / Groq 等 OpenAI 兼容服务 |
+
+每个 AI 端点都接受 `provider` / `model` 字段在请求体里临时覆盖默认 provider。
+Settings 页面 `GET /api/config/providers` 返元数据,前端不用 hardcode。
+
+### 9 个内容生成模块(AI 主页 `/ai` 左侧栏分组)
+
+**内容生成**
+1. 内容摘要 — 摘要 / 抽取关键要点
+2. 多平台文案 — 抖音 / 小红书 / B 站 / 公众号 等的发布文案
+3. 视频脚本 — 分镜 / 字幕 / 配音脚本
+4. 播客脚本 — 双人对话
+5. **扩写**(新) — 短内容拉长到 短/中/长 × 轻松/正式/学术
+6. **标题生成**(新) — N 个候选标题,可指定平台和风格
+7. **标签提取**(新) — 按 topic/emotion/audience/trending 分组
+
+**视觉创作**
+8. 图像生成 — 1:1 / 16:9 / 9:16 / 4:3 / 3:4 多比例
+9. 视频生成 — 3/6/10 秒,3/天额度
+
+**优化工具**
+- 创作历史 — 跨模块历史,带 provider / latency / prompt / result
+
+每个模块都自动落 `ai_creations` 历史(可 API 查),便于按类型过滤/删除/审计。
+
+### Content/Editor AI 助手(Phase C.3)
+
+内容编辑页 `/content/new` / `/content/{id}` 的 title / body / tags 字段都有 ✨ AI 按钮,弹窗里:
+- 标题字段 → AI 生成标题(可逐条应用)
+- 正文字段 → AI 摘要 / 扩写 / 改写文案
+- 标签字段 → AI 提取标签(可一键填进字段)
+
+从 AI 主页跳过来时(`/ai → 应用到内容`)会自动预填,流程闭环。
+
+## 🚀 Phase 2 视频生成 + 多平台分发
 
 ### 架构
 

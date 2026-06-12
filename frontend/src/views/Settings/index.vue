@@ -7,149 +7,247 @@
         <span>设置</span>
       </div>
       <h1 class="page-title">设置</h1>
-      <p class="page-subtitle">管理 AI 服务配置、查看系统信息。配置修改立即生效，无需重启。</p>
+      <p class="page-subtitle">管理 AI 服务配置、查看系统信息。配置修改立即生效,无需重启。</p>
     </header>
 
-    <!-- AI Service config card -->
-    <section class="ds-card">
-      <h2 class="ds-card__title">AI 服务配置</h2>
-      <p class="ds-card__lede">使用 MiniMax 系列模型（文本 / 图像 / 视频 / 语音）。</p>
-
-      <div class="ds-notice">
-        <div>
-          <p><strong>申请 API Key：</strong><a href="https://platform.minimaxi.com" target="_blank" rel="noopener">platform.minimaxi.com</a></p>
-          <p>配置完成后点击「测试连接」验证，AI 生成功能会立即可用。</p>
-        </div>
+    <!-- 顶部状态条:当前默认 provider + 配置总览 -->
+    <section class="ds-card status-bar" v-if="providersList">
+      <div class="status-row">
+        <span class="ds-pill ds-pill--neutral">当前默认</span>
+        <span class="ds-pill ds-pill--success">{{ defaultProviderLabel }}</span>
+        <span class="caption">
+          {{ providersReadyCount }} / 3 个 provider 已配置
+        </span>
+        <span class="grow"></span>
+        <el-button size="small" @click="loadAll">刷新</el-button>
       </div>
+    </section>
 
-      <el-form :model="form" label-position="top" v-loading="loading" class="settings-form">
+    <!-- 三张 provider 卡片(minimax / claude / openai) -->
+    <section v-for="p in providersList?.providers || []" :key="p.name" class="ds-card provider-card">
+      <header class="card-head">
+        <h2 class="ds-card__title">{{ p.label }}</h2>
+        <div class="card-status">
+          <span v-if="p.is_default" class="ds-pill ds-pill--success">默认</span>
+          <el-tag v-if="p.configured" type="success" effect="light" size="small">已配置</el-tag>
+          <el-tag v-else type="info" effect="light" size="small">未配置</el-tag>
+        </div>
+      </header>
+
+      <el-form :model="forms[p.name]" label-position="top" v-loading="loadingMap[p.name]">
         <el-form-item label="API Key">
-          <el-input v-model="form.minimax_api_key" placeholder="输入 MiniMax API Key" show-password clearable />
+          <el-input
+            v-model="forms[p.name].api_key"
+            :placeholder="`${p.key_prefix} 开头`"
+            show-password
+            clearable
+          />
+          <span v-if="p.api_key_masked" class="caption masked">当前: {{ p.api_key_masked }}</span>
         </el-form-item>
 
         <el-form-item label="Base URL">
-          <el-input v-model="form.minimax_base_url" placeholder="例如：https://api.minimaxi.com/v1" />
+          <el-input v-model="forms[p.name].base_url" :placeholder="p.default_base" />
         </el-form-item>
 
-        <el-form-item label="模型名称">
-          <el-select v-model="form.model_name" filterable allow-create default-first-option placeholder="选择或输入模型" style="width: 100%">
-            <el-option label="MiniMax-M3" value="MiniMax-M3" />
-            <el-option label="MiniMax-Text-01" value="MiniMax-Text-01" />
-            <el-option label="abab6.5s-chat" value="abab6.5s-chat" />
-            <el-option label="abab6.5-chat" value="abab6.5-chat" />
+        <el-form-item label="默认模型">
+          <el-select
+            v-model="forms[p.name].model"
+            filterable
+            allow-create
+            default-first-option
+            :placeholder="p.default_model"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="m in p.model_options.split(',')"
+              :key="m"
+              :label="m"
+              :value="m"
+            />
           </el-select>
+          <span class="caption">可从下拉选,也可输入自定义 model 名</span>
         </el-form-item>
 
         <div class="form-actions">
-          <el-button @click="loadSettings">刷新</el-button>
-          <el-button type="success" :loading="testing" :disabled="!form.minimax_api_key" @click="onTest">测试连接</el-button>
-          <el-button type="primary" :loading="saving" @click="onSave">保存配置</el-button>
+          <el-button
+            type="success"
+            :loading="testingMap[p.name]"
+            :disabled="!forms[p.name].api_key"
+            @click="onTest(p.name)"
+          >测试连接</el-button>
+          <el-button
+            type="primary"
+            :loading="savingMap[p.name]"
+            :disabled="!isDirty(p.name)"
+            @click="onSave(p.name)"
+          >保存</el-button>
+          <el-button
+            v-if="!p.is_default"
+            :disabled="!p.configured"
+            @click="onSetDefault(p.name)"
+          >设为默认</el-button>
+          <el-tag v-else type="success" effect="dark" size="small">当前默认</el-tag>
         </div>
       </el-form>
-
-      <el-divider />
-
-      <div class="status-row">
-        <span class="caption">当前状态</span>
-        <el-tag v-if="settings.configured" type="success" effect="light" round>已配置 · {{ settings.model_name }}</el-tag>
-        <el-tag v-else type="warning" effect="light" round>未配置</el-tag>
-        <span v-if="settings.minimax_api_key" class="ds-pill ds-pill--neutral">Key · {{ settings.minimax_api_key }}</span>
-      </div>
     </section>
 
     <!-- System info -->
     <section class="ds-card" style="margin-top: 32px">
       <h2 class="ds-card__title">系统信息</h2>
-      <p class="ds-card__lede">当前部署的基础信息。</p>
-
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="平台版本">v1.0.0</el-descriptions-item>
-        <el-descriptions-item label="后端">FastAPI + Pydantic v2</el-descriptions-item>
-        <el-descriptions-item label="前端">Vue 3 + TypeScript + Element Plus</el-descriptions-item>
-        <el-descriptions-item label="AI 服务">MiniMax (MiniMax-M3)</el-descriptions-item>
-        <el-descriptions-item label="存储">内存 (生产可切 PostgreSQL)</el-descriptions-item>
-        <el-descriptions-item label="设计系统">Apple (chrome) + Claude (body)</el-descriptions-item>
+        <el-descriptions-item label="AI provider 数量">3 个(minimax / claude / openai)</el-descriptions-item>
+        <el-descriptions-item label="视频生成模型">MiniMax-Hailuo-03(每日 3 次额度)</el-descriptions-item>
+        <el-descriptions-item label="视频时长档位">3 / 6 / 10 秒</el-descriptions-item>
+        <el-descriptions-item label="多平台分发">{{ supportedPlatforms.join(' · ') }}</el-descriptions-item>
       </el-descriptions>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { settingsApi, type Settings } from '@/api/settings'
+import { settingsApi, type ProviderInfo, type ProvidersListResponse } from '@/api/settings'
+import { platformApi } from '@/api/platforms'
 
-const loading = ref(false)
-const saving = ref(false)
-const testing = ref(false)
-
-const form = reactive({
-  minimax_api_key: '',
-  minimax_base_url: 'https://api.minimaxi.com/v1',
-  model_name: 'MiniMax-M3',
+// 三家 provider 的当前表单状态(独立 dirty tracking)
+interface Form { api_key: string; base_url: string; model: string }
+const forms = reactive<Record<string, Form>>({
+  minimax: { api_key: '', base_url: '', model: '' },
+  claude: { api_key: '', base_url: '', model: '' },
+  openai: { api_key: '', base_url: '', model: '' },
 })
 
-const settings = ref<Settings>({
-  configured: false,
-  minimax_api_key: '',
-  minimax_base_url: '',
-  model_name: '',
+// 上次保存的快照,用于判断 dirty
+const snapshots = reactive<Record<string, string>>({})
+
+const loadingMap = reactive({ minimax: false, claude: false, openai: false })
+const savingMap = reactive({ minimax: false, claude: false, openai: false })
+const testingMap = reactive({ minimax: false, claude: false, openai: false })
+
+const providersList = ref<ProvidersListResponse | null>(null)
+const supportedPlatforms = ref<string[]>([])
+
+const providersReadyCount = computed(() =>
+  (providersList.value?.providers || []).filter(p => p.configured).length
+)
+
+const defaultProviderLabel = computed(() => {
+  const p = (providersList.value?.providers || []).find(x => x.is_default)
+  return p ? p.label : (providersList.value?.default || 'minimax')
 })
 
-const loadSettings = async () => {
-  loading.value = true
-  try {
-    const s = await settingsApi.get()
-    settings.value = s
-    form.minimax_api_key = s.minimax_api_key || ''
-    form.minimax_base_url = s.minimax_base_url || 'https://api.minimaxi.com/v1'
-    form.model_name = s.model_name || 'MiniMax-M3'
-  } catch (e: any) {
-    ElMessage.error('加载配置失败: ' + (e.normalizedMessage || e.message))
-  } finally {
-    loading.value = false
+const isDirty = (name: string): boolean => {
+  const snap = snapshots[name] || ''
+  const cur = `${forms[name].api_key}|${forms[name].base_url}|${forms[name].model}`
+  return snap !== cur
+}
+
+const syncFormFromList = (list: ProvidersListResponse) => {
+  for (const p of list.providers) {
+    forms[p.name] = {
+      api_key: '',  // 不预填(让用户主动改)
+      base_url: p.base_url,
+      model: p.model,
+    }
+    snapshots[p.name] = `|${p.base_url}|${p.model}`
   }
 }
 
-const onSave = async () => {
-  saving.value = true
+const loadAll = async () => {
   try {
-    await settingsApi.update({
-      minimax_api_key: form.minimax_api_key,
-      minimax_base_url: form.minimax_base_url,
-      model_name: form.model_name,
-    })
-    ElMessage.success('保存成功')
-    loadSettings()
+    const list = await settingsApi.providersList()
+    providersList.value = list
+    syncFormFromList(list)
   } catch (e: any) {
-    ElMessage.error('保存失败: ' + (e.normalizedMessage || e.message))
-  } finally {
-    saving.value = false
+    ElMessage.error('加载设置失败: ' + (e.normalizedMessage || e.message))
   }
 }
 
-const onTest = async () => {
-  testing.value = true
+const onTest = async (name: string) => {
+  testingMap[name] = true
   try {
-    const res = await settingsApi.test({
-      minimax_api_key: form.minimax_api_key,
-      minimax_base_url: form.minimax_base_url,
-      model_name: form.model_name,
+    const f = forms[name]
+    const r = await settingsApi.test({
+      provider: name,
+      api_key: f.api_key,
+      base_url: f.base_url,
+      model: f.model || (providersList.value?.providers.find(p => p.name === name)?.default_model || ''),
     })
-    if (res.ok) ElMessage.success('连接成功：' + (res.message || ''))
-    else ElMessage.error('连接失败：' + (res.message || '未知错误'))
+    if (r.success) {
+      ElMessage.success(r.message + (r.response_preview ? ` · ${r.response_preview}` : ''))
+    } else {
+      ElMessage.error(r.message)
+    }
   } catch (e: any) {
     ElMessage.error('测试失败: ' + (e.normalizedMessage || e.message))
   } finally {
-    testing.value = false
+    testingMap[name] = false
   }
 }
 
-onMounted(loadSettings)
+const onSave = async (name: string) => {
+  savingMap[name] = true
+  try {
+    const f = forms[name]
+    await settingsApi.update({
+      [name]: {
+        api_key: f.api_key || undefined,
+        base_url: f.base_url || undefined,
+        model: f.model || undefined,
+      },
+    })
+    ElMessage.success(`${name} 已保存`)
+    await loadAll()
+  } catch (e: any) {
+    ElMessage.error('保存失败: ' + (e.normalizedMessage || e.message))
+  } finally {
+    savingMap[name] = false
+  }
+}
+
+const onSetDefault = async (name: string) => {
+  try {
+    await settingsApi.update({ default_provider: name })
+    ElMessage.success(`已将 ${name} 设为默认 provider`)
+    await loadAll()
+  } catch (e: any) {
+    ElMessage.error('设置默认失败: ' + (e.normalizedMessage || e.message))
+  }
+}
+
+onMounted(async () => {
+  await loadAll()
+  // 拉 supported_platforms 给底部 System info
+  try {
+    const sauInfo = await platformApi.sauStatus()
+    supportedPlatforms.value = sauInfo.supported_platforms
+  } catch { /* silent */ }
+})
 </script>
 
 <style scoped>
-.status-row {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+.status-bar {
+  margin-bottom: 16px;
+  padding: 12px 18px;
 }
+.status-row { display: flex; align-items: center; gap: 10px; }
+.status-row .grow { flex: 1; }
+
+.provider-card {
+  margin-bottom: 16px;
+}
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.card-status { display: flex; gap: 8px; align-items: center; }
+
+.masked {
+  display: inline-block; margin-top: 4px;
+  font-family: var(--font-mono, monospace); font-size: 12px;
+}
+.caption { color: var(--claude-stone); font-size: 12px; }
+
+.form-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
 </style>

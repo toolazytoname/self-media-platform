@@ -33,6 +33,7 @@ def fresh_store():
     store.templates.clear()
     store.images.clear()
     store.videos.clear()  # Phase 2
+    store.ai_creations.clear()  # Phase B.4
     # 重新初始化默认模板
     from app.api.templates import init_default_templates
     init_default_templates()
