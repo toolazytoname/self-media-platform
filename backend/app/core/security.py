@@ -1,25 +1,27 @@
 # 安全工具：JWT Token 生成 / 校验 / 密码哈希
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+import bcrypt
 import jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
 
-
-# 密码哈希
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt 的有效负载上限是 72 字节;超长密码按规范应在应用层截断。
+# 这里用 [:72] 显式截断,避免 bcrypt>=4.1 抛 ValueError。
+_BCRYPT_MAX_BYTES = 72
 
 
 def hash_password(password: str) -> str:
     """对密码进行 bcrypt 哈希"""
-    return pwd_context.hash(password)
+    pwd = password.encode("utf-8")[:_BCRYPT_MAX_BYTES]
+    return bcrypt.hashpw(pwd, bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """校验明文密码与哈希是否匹配"""
     try:
-        return pwd_context.verify(plain, hashed)
+        pwd = plain.encode("utf-8")[:_BCRYPT_MAX_BYTES]
+        return bcrypt.checkpw(pwd, hashed.encode("utf-8"))
     except Exception:
         return False
 

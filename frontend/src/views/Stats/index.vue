@@ -76,16 +76,8 @@
           <p>暂无发布数据</p>
           <p class="caption">发布内容后这里会显示统计</p>
         </div>
-        <div v-else class="bar-list">
-          <div v-for="(item, index) in platformEntries" :key="item.platform" class="bar-row">
-            <div class="bar-name">
-              <span class="ds-pill ds-pill--neutral">{{ getPlatformName(item.platform) }}</span>
-            </div>
-            <div class="bar-track">
-              <div class="bar-fill" :style="{ width: item.percent + '%', background: barColor(index) }"></div>
-            </div>
-            <div class="bar-value mono">{{ item.count }}</div>
-          </div>
+        <div v-else class="chart-canvas">
+          <Doughnut :data="platformChartData" :options="doughnutOptions" />
         </div>
       </section>
 
@@ -97,18 +89,8 @@
           <p>暂无内容</p>
           <p class="caption">创建内容后这里会显示状态分布</p>
         </div>
-        <div v-else class="bar-list">
-          <div v-for="item in contentStatusEntries" :key="item.status" class="bar-row">
-            <div class="bar-name">
-              <span class="ds-pill" :class="`ds-pill--${item.status === 'published' ? 'success' : item.status === 'pending' ? 'warning' : 'neutral'}`">
-                {{ item.label }}
-              </span>
-            </div>
-            <div class="bar-track">
-              <div class="bar-fill" :style="{ width: item.percent + '%' }"></div>
-            </div>
-            <div class="bar-value mono">{{ item.count }}</div>
-          </div>
+        <div v-else class="chart-canvas">
+          <Bar :data="contentStatusChartData" :options="barOptions" />
         </div>
       </section>
     </div>
@@ -128,8 +110,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Chart, registerables } from 'chart.js'
+import { Doughnut, Bar } from 'vue-chartjs'
 import { statsApi, type Stats } from '@/api/cms'
 import { getPlatformName, CONTENT_STATUSES } from '@/constants'
+
+// Register all chart.js components once at module load.
+Chart.register(...registerables)
 
 const stats = ref<any>({
   content_total: 0, content_draft: 0, content_pending: 0, content_published: 0,
@@ -138,27 +125,62 @@ const stats = ref<any>({
   platform_distribution: {} as Record<string, number>,
 })
 
+// Apple×Claude design system palette (tokens.css)
 const COLORS = ['#c96442', '#d97757', '#10b981', '#3898ec', '#87867f', '#5e5d59']
-const barColor = (i: number) => COLORS[i % COLORS.length]
 
 const platformEntries = computed(() => {
   const obj: Record<string, number> = stats.value.platform_distribution || {}
   const total = Object.values(obj).reduce((s, v) => s + (v || 0), 0)
   if (total === 0) return []
   return Object.entries(obj)
-    .map(([platform, count]) => ({ platform, count, percent: Math.round((count / total) * 100) }))
+    .map(([platform, count]) => ({ platform, count }))
     .sort((a, b) => b.count - a.count)
 })
 
-const contentStatusEntries = computed(() => {
-  const total = (stats.value.content_draft || 0) + (stats.value.content_pending || 0) + (stats.value.content_published || 0)
-  if (total === 0) return []
-  return [
-    { status: 'draft', label: '草稿', count: stats.value.content_draft || 0, percent: Math.round(((stats.value.content_draft || 0) / total) * 100) },
-    { status: 'pending', label: '待审核', count: stats.value.content_pending || 0, percent: Math.round(((stats.value.content_pending || 0) / total) * 100) },
-    { status: 'published', label: '已发布', count: stats.value.content_published || 0, percent: Math.round(((stats.value.content_published || 0) / total) * 100) },
-  ].filter(s => s.count > 0).sort((a, b) => b.count - a.count)
+const platformChartData = computed(() => ({
+  labels: platformEntries.value.map(e => getPlatformName(e.platform)),
+  datasets: [{
+    data: platformEntries.value.map(e => e.count),
+    backgroundColor: platformEntries.value.map((_, i) => COLORS[i % COLORS.length]),
+    borderColor: 'var(--claude-ivory, #faf9f5)',
+    borderWidth: 2,
+  }],
+}))
+
+const contentStatusChartData = computed(() => {
+  const draft = stats.value.content_draft || 0
+  const pending = stats.value.content_pending || 0
+  const published = stats.value.content_published || 0
+  return {
+    labels: ['草稿', '待审核', '已发布'],
+    datasets: [{
+      data: [draft, pending, published],
+      backgroundColor: ['#87867f', '#d97757', '#10b981'],
+      borderRadius: 6,
+      borderSkipped: false,
+    }],
+  }
 })
+
+const doughnutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'bottom' as const, labels: { boxWidth: 12, padding: 12 } },
+  },
+  cutout: '60%',
+}
+
+const barOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y' as const,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { beginAtZero: true, ticks: { precision: 0 } },
+    y: { grid: { display: false } },
+  },
+}
 
 const load = async () => {
   try {
@@ -223,6 +245,11 @@ onMounted(load)
 .charts-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 16px;
+}
+.chart-canvas {
+  position: relative;
+  height: 280px;
+  padding: 8px 0;
 }
 .ds-empty--compact { padding: 32px 16px; }
 </style>

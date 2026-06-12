@@ -103,7 +103,8 @@ class TestContentWorkflow:
     def test_duplicate(self, client, fresh_store):
         item = _create(client, title="Original", body="body", tags=["t"]).json()
         r = client.post(f"/api/content/{item['id']}/duplicate")
-        assert r.status_code == 200
+        # 1a45f67 changed duplicate to return 201 (create semantics)
+        assert r.status_code == 201
         new_item = r.json()
         assert new_item["id"] != item["id"]
         assert "副本" in new_item["title"]

@@ -11,6 +11,8 @@ build/
 # IDE
 .idea/
 .vscode/
+*.swp
+*.swo
 
 # OS
 .DS_Store
@@ -22,3 +24,35 @@ npm-debug.log*
 
 # Uploads
 uploads/
+
+# Phase 2: 视频生成 / 平台 cookie 存储(运行时生成,不入库)
+backend/storage/
+backend/storage/videos/
+backend/storage/cookies/
+
+# Claude Code per-project state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/cache/
+.claude/file-history/
+.claude/paste-cache/
+.claude/session-data/
+.claude/session-env/
+.claude/tasks/
+.claude/jobs/
+.claude/homunculus/
+.claude/telemetry/
+.claude/usage-data/
+.claude/metrics/
+.claude/backups/
+.claude/bash-commands.log
+.claude/cost-tracker.log
+.claude/daemon.log
+.claude/debug/
+.claude/.last-*
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# VM ephemeral state
+.orbstack-local/

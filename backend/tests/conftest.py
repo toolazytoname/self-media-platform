@@ -10,8 +10,8 @@ if str(BACKEND_DIR) not in sys.path:
 
 
 @pytest.fixture
-def client():
-    """FastAPI 测试客户端"""
+def client(fresh_store):
+    """FastAPI 测试客户端(每个测试自动重置 store,避免跨测试污染)"""
     from fastapi.testclient import TestClient
     from app.main import app
     return TestClient(app)
@@ -31,6 +31,8 @@ def fresh_store():
     store.publish_records.clear()
     store.scheduled_tasks.clear()
     store.templates.clear()
+    store.images.clear()
+    store.videos.clear()  # Phase 2
     # 重新初始化默认模板
     from app.api.templates import init_default_templates
     init_default_templates()
