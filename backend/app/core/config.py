@@ -72,6 +72,14 @@ class Settings(BaseSettings):
     WECHAT_APP_SECRET: Optional[str] = None
     WECHAT_API_BASE: str = "https://api.weixin.qq.com"
 
+    # Phase 5: NotebookLM CLI 路径
+    # 默认从 PATH 找;VM 里有 ~/.venv-smp/bin/notebooklm fallback
+    NOTEBOOKLM_BIN: str = "notebooklm"
+    # NotebookLM 是 Google 服务(国外站);网络受限时设代理
+    # 例: NOTEBOOKLM_PROXY=http://127.0.0.1:7890
+    # 走标准 https_proxy / HTTPS_PROXY 环境变量透传给 CLI
+    NOTEBOOKLM_PROXY: Optional[str] = None
+
     # Phase 2: 视频生成超时/轮询
     SCHEDULER_VIDEO_TIMEOUT_SECONDS: int = 600
     VIDEO_POLL_INTERVAL_SECONDS: int = 5

@@ -8,7 +8,10 @@ pydantic==2.5.3
 pydantic-settings==2.1.0
 
 # HTTP client
-httpx==0.26.0
+# httpx 必须 < 0.27:notebooklm-py 依赖的 playwright 会拉新版 httpx,
+# 但 fastapi 0.109 自带 starlette 0.35 用 TestClient(app) 旧签名
+# 跟 httpx>=0.27 的 Client(app=...) 不兼容
+httpx<0.27
 requests==2.31.0
 
 # Auth (P1 feature ready)
@@ -21,3 +24,7 @@ bcrypt>=4.0
 pytest==7.4.4
 pytest-asyncio==0.23.3
 pytest-cov==4.1.0
+
+# Phase 5: NotebookLM 集成(notebooklm-py 走 subprocess,装在 VM / 系统级即可)
+# pipx install "notebooklm-py[browser]"  # 推荐
+# pip install "notebooklm-py[browser]"    # 也可

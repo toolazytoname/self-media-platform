@@ -10,6 +10,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/content/view/:id', name: 'ContentView', component: () => import('../views/Content/View.vue') },
   { path: '/topic', name: 'Topic', component: () => import('../views/Topic/index.vue') },
   { path: '/material', name: 'Material', component: () => import('../views/Material/index.vue') },
+  { path: '/sources', name: 'Sources', component: () => import('../views/Sources/index.vue') },
   { path: '/review', name: 'Review', component: () => import('../views/Review/index.vue') },
   { path: '/platform', name: 'Platform', component: () => import('../views/Platform/index.vue') },
   { path: '/publish-records', name: 'PublishRecords', component: () => import('../views/PublishRecords/index.vue') },

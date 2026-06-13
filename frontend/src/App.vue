@@ -59,6 +59,16 @@
             </span>
             <span>素材库</span>
           </router-link>
+          <router-link to="/sources">
+            <span class="icon">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M5 4h7l3 3v9a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z" stroke-linejoin="round" />
+                <path d="M12 4v3h3" stroke-linejoin="round" />
+                <path d="M7 11h6M7 14h4" stroke-linecap="round" />
+              </svg>
+            </span>
+            <span>来源管理</span>
+          </router-link>
         </nav>
 
         <div class="section-label">AI 工具</div>
