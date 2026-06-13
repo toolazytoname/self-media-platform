@@ -3,11 +3,24 @@
 镜像现有 test_ai_platforms.py 风格,全程通过 TestClient,关键路径 mock。
 """
 import pytest
+import shutil
+from pathlib import Path
 from unittest.mock import patch, AsyncMock, MagicMock
 
 from app.services.ai_providers import get_provider, register_provider
 from app.services.ai_providers.base import BaseProvider
 from app.store import store
+
+
+def _copy_pdf(name: str) -> str:
+    src = Path("/Users/lazy/Code/crack/claude/self-media-platform/data") / name
+    if not src.exists():
+        pytest.skip(f"测试 PDF 不存在: {src}")
+    dst_dir = Path("/tmp/source_ctx_test")
+    dst_dir.mkdir(exist_ok=True)
+    dst = dst_dir / name
+    shutil.copy(src, dst)
+    return str(dst)
 
 
 # ============ Mock provider for tests ============
@@ -284,3 +297,77 @@ class TestAICreations:
         assert "prompt" in rec
         assert "result" in rec
         assert rec["result"] == "ok"
+
+
+# ============ Phase 3: 来源 context 注入 ============
+
+class TestSourceContextInjection:
+    """AI 端点接受 source_id / chapter_id 时,把章节内容注入到 system message 头部。"""
+
+    def test_expand_with_text_source(self, client, fresh_store, mock_provider):
+        """text 类型 source: 整篇 content 注入。"""
+        client.post("/api/sources", json={
+            "name": "notes", "type": "text",
+            "content": "这是来自我的笔记的一段话,讲述 AI 改变生活的故事。",
+        })
+        src_id = client.get("/api/sources").json()[0]["id"]
+        r = client.post("/api/ai/expand", json={
+            "content": "原文",
+            "target_length": "medium",
+            "source_id": src_id,
+        })
+        assert r.status_code == 200
+        # mock provider 的 last_messages 应该含 source context
+        msgs = mock_provider.last_messages
+        assert any("参考资料来源" in m.get("content", "") for m in msgs)
+        # 来源内容也应该注入
+        assert any("AI 改变生活" in m.get("content", "") for m in msgs)
+
+    def test_expand_with_pdf_chapter(self, client, fresh_store, mock_provider):
+        """pdf + chapter_id: 单章内容注入(懒加载)。"""
+        path = _copy_pdf("小狗钱钱.pdf")
+        sid = client.post("/api/sources", json={
+            "name": "x", "type": "pdf", "path": path,
+        }).json()["id"]
+        chapters = client.get(f"/api/sources/{sid}/chapters").json()
+        first_ch = chapters[0]
+        r = client.post("/api/ai/expand", json={
+            "content": "用小狗钱钱第一章做扩写输入",
+            "source_id": sid,
+            "chapter_id": first_ch["id"],
+        })
+        assert r.status_code == 200
+        msgs = mock_provider.last_messages
+        # source context 注入,且是 chapter 全文(触发懒加载)
+        assert any("拉布拉多" in m.get("content", "") for m in msgs)
+
+    def test_no_source_id_no_injection(self, client, fresh_store, mock_provider):
+        """没传 source_id → 不注入 context。"""
+        client.post("/api/ai/expand", json={"content": "无 source"})
+        msgs = mock_provider.last_messages
+        assert not any("参考资料来源" in m.get("content", "") for m in msgs)
+
+    def test_invalid_source_id_silently_ignored(self, client, fresh_store, mock_provider):
+        """source_id 不存在 → 当没传处理,不报错。"""
+        r = client.post("/api/ai/expand", json={
+            "content": "x",
+            "source_id": "src_nonexistent",
+        })
+        assert r.status_code == 200
+        msgs = mock_provider.last_messages
+        assert not any("参考资料来源" in m.get("content", "") for m in msgs)
+
+    def test_titles_with_source(self, client, fresh_store, mock_provider):
+        """titles 模块也接 source_id。"""
+        client.post("/api/sources", json={
+            "name": "t", "type": "text",
+            "content": "AI 在内容创作领域的应用。",
+        })
+        src_id = client.get("/api/sources").json()[0]["id"]
+        mock_provider._response = "标题1\n标题2"
+        r = client.post("/api/ai/titles", json={
+            "content": "x",
+            "source_id": src_id,
+        })
+        assert r.status_code == 200
+        assert any("参考资料来源" in m.get("content", "") for m in mock_provider.last_messages)

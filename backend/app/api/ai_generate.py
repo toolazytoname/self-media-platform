@@ -31,6 +31,88 @@ async def chat_completion(
     )
 
 
+def _resolve_source_context(
+    source_id: Optional[str], chapter_id: Optional[str], max_chars: int = 6000
+) -> Optional[str]:
+    """Phase 3:从来源 store 取 context。
+
+    返回:
+      - None: 没传 source_id,或 source 不存在
+      - str: 章节全文(或来源 content 前 max_chars 字)
+
+    caller 把它当 system message 或 user message 前缀注入。
+    """
+    if not source_id:
+        return None
+    from app.store import store
+    src = store.get_source(source_id)
+    if not src:
+        return None
+
+    if chapter_id:
+        ch = store.get_source_chapter(chapter_id)
+        if not ch or ch.get("source_id") != source_id:
+            return None
+        # 懒加载章节全文(首次访问提取 PDF)
+        if "content" not in ch and src.get("type") == "pdf":
+            try:
+                from app.services.pdf_processor import PdfProcessor, Chapter as PdfChapter
+                ch_obj = PdfChapter(
+                    id=ch["id"], title=ch["title"],
+                    page_start=ch["page_start"], page_end=ch["page_end"],
+                    char_count=ch["char_count"], method=ch["method"], preview=ch["preview"],
+                )
+                ch["content"] = PdfProcessor(src["path"]).extract_chapter(ch_obj)
+            except Exception:
+                return None
+        text = ch.get("content") or ch.get("preview", "")
+    else:
+        # 没指定 chapter:用来源自身 content (text 类型) 或第一章节的 preview
+        if src.get("type") == "text":
+            text = src.get("content", "")
+        else:
+            chapters = store.list_source_chapters(source_id)
+            if chapters:
+                text = chapters[0].get("preview", "")
+            else:
+                text = ""
+
+    if not text:
+        return None
+    # 截断到 max_chars
+    if len(text) > max_chars:
+        text = text[:max_chars] + "\n\n[…(剩余内容已截断)]"
+    return text
+
+
+def _inject_source_context_into(
+    messages: List[Dict[str, str]],
+    source_id: Optional[str],
+    chapter_id: Optional[str],
+) -> List[Dict[str, str]]:
+    """把 source context 塞到 messages 头部作为 system message。
+
+    规则:
+      - 已存在 system message → 追加内容(不覆盖)
+      - 没 system message → 在最前面插入新 system message
+    """
+    ctx = _resolve_source_context(source_id, chapter_id)
+    if not ctx:
+        return messages
+    new_messages = list(messages)
+    if new_messages and new_messages[0].get("role") == "system":
+        new_messages[0] = {
+            "role": "system",
+            "content": new_messages[0]["content"] + "\n\n# 参考资料来源\n\n" + ctx,
+        }
+    else:
+        new_messages.insert(0, {
+            "role": "system",
+            "content": "# 参考资料来源\n\n" + ctx,
+        })
+    return new_messages
+
+
 async def _record_ai_creation(
     creation_type: str,
     prompt_summary: str,
@@ -85,11 +167,14 @@ async def _timed_chat(
 
 # ============ 请求模型 ============
 # Phase A: 每个端点都加 provider/model 字段(可选,默认走 DEFAULT_AI_PROVIDER)
+# Phase 3: 加 source_id / chapter_id 字段 — 让 AI 生成能引用 NotebookLM 风格来源
 
 class ContentSummaryRequest(BaseModel):
     content: str
     provider: Optional[str] = None
     model: Optional[str] = None
+    source_id: Optional[str] = None   # Phase 3: 从来源注入 context
+    chapter_id: Optional[str] = None
 
 
 class PodcastScriptRequest(BaseModel):
@@ -97,6 +182,8 @@ class PodcastScriptRequest(BaseModel):
     style: Optional[str] = "两主播对话讨论"
     provider: Optional[str] = None
     model: Optional[str] = None
+    source_id: Optional[str] = None
+    chapter_id: Optional[str] = None
 
 
 class CopyRequest(BaseModel):
@@ -105,6 +192,8 @@ class CopyRequest(BaseModel):
     content_type: Optional[str] = "short_video"
     provider: Optional[str] = None
     model: Optional[str] = None
+    source_id: Optional[str] = None
+    chapter_id: Optional[str] = None
 
 
 class VideoScriptRequest(BaseModel):
@@ -112,6 +201,8 @@ class VideoScriptRequest(BaseModel):
     duration: Optional[int] = 60
     provider: Optional[str] = None
     model: Optional[str] = None
+    source_id: Optional[str] = None
+    chapter_id: Optional[str] = None
 
 
 class ImageGenerateRequest(BaseModel):
@@ -191,6 +282,7 @@ async def summarize_content(req: ContentSummaryRequest) -> Dict[str, Any]:
             {"role": "system", "content": "你是一个内容分析专家，擅长提取关键信息并生成结构化摘要。"},
             {"role": "user", "content": "请分析以下内容，生成简洁的摘要（150字以内）和关键要点：\n\n" + req.content[:10000]}
         ]
+        messages = _inject_source_context_into(messages, req.source_id, req.chapter_id)
         result = await _timed_chat(
             creation_type="summary",
             messages=messages,
@@ -213,6 +305,7 @@ async def generate_podcast(req: PodcastScriptRequest) -> Dict[str, Any]:
             {"role": "system", "content": "你是一个播客脚本写作专家。生成为两个角色（主播A和主播B）的对话脚本。要求：1. 对话自然、有深度 2. 涵盖内容的核心要点 3. 有问答、有讨论、有总结 4. 约1500-2000字（5-8分钟朗读）"},
             {"role": "user", "content": "基于以下内容生成播客脚本：\n\n" + req.content[:8000]}
         ]
+        messages = _inject_source_context_into(messages, req.source_id, req.chapter_id)
         script = await _timed_chat(
             creation_type="podcast",
             messages=messages,
@@ -248,6 +341,7 @@ async def generate_copy(req: CopyRequest) -> Dict[str, Any]:
             {"role": "system", "content": "你是自媒体内容专家，擅长生成适合平台的发布文案。\n" + tip},
             {"role": "user", "content": "为主题「" + req.topic + "」生成发布文案，包括标题和正文"}
         ]
+        messages = _inject_source_context_into(messages, req.source_id, req.chapter_id)
         result = await _timed_chat(
             creation_type="copy",
             messages=messages,
@@ -269,6 +363,7 @@ async def generate_video_script(req: VideoScriptRequest) -> Dict[str, Any]:
             {"role": "system", "content": "你是一个视频脚本写作专家。生成视频脚本，要求：1. 分镜描述（画面、字幕、配音）2. 时长控制 3. 节奏把控 4. 开头留人、结尾引导 格式清晰，便于制作"},
             {"role": "user", "content": "为主题「" + req.topic + "」生成" + str(req.duration) + "秒视频脚本"}
         ]
+        messages = _inject_source_context_into(messages, req.source_id, req.chapter_id)
         script = await _timed_chat(
             creation_type="video_script",
             messages=messages,
@@ -497,6 +592,8 @@ class ExpandRequest(BaseModel):
     tone: str = Field(default="casual", description="casual / formal / academic")
     provider: Optional[str] = None
     model: Optional[str] = None
+    source_id: Optional[str] = None  # Phase 3: 来源(context 注入)
+    chapter_id: Optional[str] = None
 
 
 @router.post("/expand")
@@ -525,6 +622,7 @@ async def expand_content(req: ExpandRequest) -> Dict[str, Any]:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": "请扩写以下内容:\n\n" + req.content},
         ]
+        messages = _inject_source_context_into(messages, req.source_id, req.chapter_id)
         expanded = await _timed_chat(
             creation_type="expand",
             messages=messages,
@@ -553,6 +651,8 @@ class TitlesRequest(BaseModel):
     style: str = Field(default="neutral", description="clickbait / neutral / professional")
     provider: Optional[str] = None
     model: Optional[str] = None
+    source_id: Optional[str] = None
+    chapter_id: Optional[str] = None
 
 
 class TitleSuggestion(BaseModel):
@@ -602,6 +702,7 @@ async def generate_titles(req: TitlesRequest) -> TitlesResponse:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
+        messages = _inject_source_context_into(messages, req.source_id, req.chapter_id)
         raw = await _timed_chat(
             creation_type="titles",
             messages=messages,
@@ -633,6 +734,8 @@ class TagsRequest(BaseModel):
     locale: str = Field(default="mixed", description="zh / en / emoji / mixed")
     provider: Optional[str] = None
     model: Optional[str] = None
+    source_id: Optional[str] = None
+    chapter_id: Optional[str] = None
 
 
 class TagItem(BaseModel):
@@ -673,6 +776,7 @@ async def generate_tags(req: TagsRequest) -> TagsResponse:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": req.content[:5000]},
         ]
+        messages = _inject_source_context_into(messages, req.source_id, req.chapter_id)
         raw = await _timed_chat(
             creation_type="tags",
             messages=messages,

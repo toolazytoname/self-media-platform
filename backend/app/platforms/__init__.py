@@ -10,10 +10,12 @@ from typing import Dict, Type
 
 from app.platforms.base import PlatformAdapter, PlatformType
 from app.platforms.douyin import DouyinAdapter
+from app.platforms.wechat import WeChatAdapter
 
 # Phase 2 注册表
 _REGISTRY: Dict[PlatformType, Type[PlatformAdapter]] = {
     PlatformType.DOUYIN: DouyinAdapter,
+    PlatformType.WECHAT: WeChatAdapter,
     # 后续:BILIBILI, XIAOHONGSHU, ...
 }
 
@@ -42,4 +44,5 @@ __all__ = [
     "get_adapter",
     "supported_platforms",
     "DouyinAdapter",
+    "WeChatAdapter",
 ]

@@ -26,6 +26,9 @@ class AccountCreate(BaseModel):
     account_id: Optional[str] = None  # 平台上的账号 ID
     description: str = ""
     cookie_path: Optional[str] = None  # Phase 2: sau 的 storage_state 路径
+    # Phase 2 ext: 公众号 Adapter(草稿箱)
+    app_id: Optional[str] = None        # 公众号 AppID
+    app_secret: Optional[str] = None    # 公众号 AppSecret
 
 
 class AccountUpdate(BaseModel):
@@ -33,6 +36,8 @@ class AccountUpdate(BaseModel):
     status: Optional[str] = None  # active/inactive
     description: Optional[str] = None
     cookie_path: Optional[str] = None
+    app_id: Optional[str] = None
+    app_secret: Optional[str] = None
 
 
 class PublishRequest(BaseModel):
@@ -65,8 +70,11 @@ async def add_account(req: AccountCreate):
     if req.platform not in VALID_PLATFORMS:
         raise HTTPException(status_code=400, detail=f"Unsupported platform: {req.platform}")
     data = req.model_dump()
-    # cookie_path 缺省 = storage/cookies/{name}.json
-    if not data.get("cookie_path"):
+    # cookie_path 缺省 = storage/cookies/{name}.json(抖音 / B站 用)
+    # 公众号用 app_id / app_secret,不需要 cookie_path
+    if req.platform == "wechat":
+        data.pop("cookie_path", None)
+    elif not data.get("cookie_path"):
         data["cookie_path"] = str(Path(settings.COOKIES_DIR) / f"{data['name']}.json")
     return store.add_account(data)
 

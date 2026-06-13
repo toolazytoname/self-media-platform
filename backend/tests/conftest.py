@@ -34,6 +34,8 @@ def fresh_store():
     store.images.clear()
     store.videos.clear()  # Phase 2
     store.ai_creations.clear()  # Phase B.4
+    store.sources.clear()  # Phase 3 — 来源
+    store.source_chapters.clear()
     # 重新初始化默认模板
     from app.api.templates import init_default_templates
     init_default_templates()

@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     # 默认抖音账号名(cookie_path = COOKIES_DIR/{name}.json)
     DOUYIN_DEFAULT_ACCOUNT: str = "default"
 
+    # Phase 2 ext: 公众号(WeChat MP) — 用 access_token 模式
+    # AppID / AppSecret 在 Settings 页面填, 也支持 env
+    WECHAT_APP_ID: Optional[str] = None
+    WECHAT_APP_SECRET: Optional[str] = None
+    WECHAT_API_BASE: str = "https://api.weixin.qq.com"
+
     # Phase 2: 视频生成超时/轮询
     SCHEDULER_VIDEO_TIMEOUT_SECONDS: int = 600
     VIDEO_POLL_INTERVAL_SECONDS: int = 5

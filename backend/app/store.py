@@ -34,6 +34,11 @@ class Store:
         self.videos: List[Dict[str, Any]] = []
         # AI 创作历史(跨模块) — Phase B.4
         self.ai_creations: List[Dict[str, Any]] = []
+        # 来源(NotebookLM 风格) — Phase 3
+        # 支持: pdf 文件路径 / url / 纯文本
+        # 每个 source 可以拆成多个 chapter(主要给 PDF 用)
+        self.sources: List[Dict[str, Any]] = []
+        self.source_chapters: List[Dict[str, Any]] = []
 
     # ============ AIGC Images ============
     def add_image(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -412,6 +417,54 @@ class Store:
                 self.scheduled_tasks.pop(i)
                 return True
         return False
+
+    # ============ Sources(NotebookLM 风格) ============
+    def add_source(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        item["id"] = item.get("id") or f"src_{uuid.uuid4().hex[:10]}"
+        item.setdefault("created_at", datetime.now().isoformat())
+        self.sources.append(item)
+        return item
+
+    def list_sources(self, type: Optional[str] = None) -> List[Dict[str, Any]]:
+        items = self.sources
+        if type:
+            items = [s for s in items if s.get("type") == type]
+        return list(reversed(items))
+
+    def get_source(self, source_id: str) -> Dict[str, Any] | None:
+        for s in self.sources:
+            if s.get("id") == source_id:
+                return s
+        return None
+
+    def delete_source(self, source_id: str) -> bool:
+        # 删 source 同时清掉它的 chapters
+        for i, s in enumerate(self.sources):
+            if s.get("id") == source_id:
+                self.sources.pop(i)
+                self.source_chapters = [
+                    c for c in self.source_chapters if c.get("source_id") != source_id
+                ]
+                return True
+        return False
+
+    def add_source_chapter(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        item["id"] = item.get("id") or f"sch_{uuid.uuid4().hex[:10]}"
+        item.setdefault("created_at", datetime.now().isoformat())
+        self.source_chapters.append(item)
+        return item
+
+    def list_source_chapters(self, source_id: str) -> List[Dict[str, Any]]:
+        items = [c for c in self.source_chapters if c.get("source_id") == source_id]
+        # 按 chapter_index 排序
+        items.sort(key=lambda c: c.get("chapter_index", 0))
+        return items
+
+    def get_source_chapter(self, chapter_id: str) -> Dict[str, Any] | None:
+        for c in self.source_chapters:
+            if c.get("id") == chapter_id:
+                return c
+        return None
 
     # ============ Stats ============
     def get_stats(self) -> Dict[str, int]:

@@ -30,6 +30,9 @@ backend/storage/
 backend/storage/videos/
 backend/storage/cookies/
 
+# Phase 4: 用户提供的 PDF 测试数据(不入库;test 会用 _copy_pdf 跳过)
+data/
+
 # Claude Code per-project state
 .claude/settings.local.json
 .claude/scheduled_tasks.lock

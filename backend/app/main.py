@@ -13,6 +13,7 @@ from app.api import (
     settings as settings_api,
     auth as auth_api,
     templates as templates_api,
+    sources as sources_api,
 )
 from app.core.config import settings
 from app.services.scheduler_loop import scheduler_loop
@@ -72,6 +73,7 @@ app.include_router(cms.router, prefix="/api/cms", tags=["CMS"])
 app.include_router(settings_api.router, prefix="/api/config", tags=["设置"])
 app.include_router(auth_api.router, prefix="/api/auth", tags=["认证"])
 app.include_router(templates_api.router, prefix="/api/templates", tags=["模板"])
+app.include_router(sources_api.router, prefix="/api/sources", tags=["来源管理"])
 
 
 @app.get("/")
