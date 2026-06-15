@@ -58,7 +58,7 @@
         <template #default="{ row }">
           <span class="ds-status" :class="statusClass(row.status)">
             <span class="dot"></span>
-            {{ getStatusMeta(PUBLISH_STATUSES, row.status).label }}
+            {{ statusLabel(row.status) || getStatusMeta(PUBLISH_STATUSES, row.status).label }}
           </span>
         </template>
       </el-table-column>
@@ -67,11 +67,14 @@
           <span class="mono">{{ formatDate(row.scheduled_at) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="结果" min-width="160" show-overflow-tooltip>
+      <el-table-column label="结果" min-width="220" show-overflow-tooltip>
         <template #default="{ row }">
           <span v-if="row.error_message" class="ds-pill ds-pill--warning">{{ row.error_message }}</span>
           <span v-else-if="row.url" class="ds-pill ds-pill--success">
             <a :href="row.url" target="_blank" rel="noopener">查看</a>
+          </span>
+          <span v-else-if="row.platform === 'wechat' && row.freepublish_status != null" class="ds-pill ds-pill--neutral">
+            freepublish={{ row.freepublish_status }}
           </span>
           <span v-else class="caption">—</span>
         </template>
@@ -143,9 +146,25 @@ const filteredList = computed(() => {
 
 const statusClass = (s: string) => {
   if (s === 'success' || s === 'published') return 'ds-status--success'
-  if (s === 'pending' || s === 'scheduled') return 'ds-status--warning'
+  if (s === 'pending' || s === 'scheduled' || s === 'publishing' || s === 'freepublish_submitted') return 'ds-status--warning'
   if (s === 'failed') return 'ds-status--error'
+  if (s === 'draft_added') return 'ds-status--neutral'
   return 'ds-status--neutral'
+}
+
+const statusLabel = (s: string): string => {
+  // 中文状态标签
+  const map: Record<string, string> = {
+    pending: '待执行',
+    scheduled: '已调度',
+    uploading: '上传中',
+    publishing: '发布中',
+    draft_added: '草稿已写入',
+    freepublish_submitted: '审核中',
+    published: '已发布',
+    failed: '失败',
+  }
+  return map[s] || s
 }
 
 const loadList = async () => {

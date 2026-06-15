@@ -16,6 +16,7 @@ import logging
 import mimetypes
 import os
 import time
+import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
@@ -221,3 +222,277 @@ class WeChatAdapter(PlatformAdapter):
             return r.json()
         except Exception:
             return {"_status": r.status_code, "_text": r.text[:500]}
+
+    # ============================================================
+    # P0-1: 全自动图文混排 — uploadimg / freepublish / 轮询 / 编排
+    # ============================================================
+
+    async def _upload_inline_image(self, image_path: str) -> str:
+        """POST /cgi-bin/media/uploadimg(临时素材)— 上传正文图片,返 mmbiz URL。
+
+        与 _upload_image_material(永久素材,for thumb)的区别:
+        - 永久素材:有 5000 张上限,长期存储,用于封面
+        - 临时素材:无存储上限,3 天有效,但 URL 永久可用(微信官方承诺),
+          用于文章正文 <img>。
+
+        失败抛 WeChatUploadError(errcode 透传)。
+        """
+        url = f"{self.base_url}/cgi-bin/media/uploadimg"
+        params = {"access_token": self._token.token}
+        if self._request_override:
+            res = await self._request_override("UPLOAD", url, params=params, file_path=image_path)
+        else:
+            mime = mimetypes.guess_type(image_path)[0] or "image/jpeg"
+            with open(image_path, "rb") as f:
+                files = {"media": (os.path.basename(image_path), f, mime)}
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    r = await client.post(url, params=params, files=files)
+            try:
+                res = r.json()
+            except Exception:
+                res = {"_status": r.status_code, "_text": r.text[:500]}
+        if res.get("errcode") and res["errcode"] != 0:
+            raise WeChatUploadError(
+                f"公众号 uploadimg 失败: errcode={res.get('errcode')} errmsg={res.get('errmsg')}"
+            )
+        if "url" not in res:
+            raise WeChatUploadError(
+                f"公众号 uploadimg 返无 url: {json.dumps(res)[:200]}"
+            )
+        return res["url"]
+
+    async def submit_for_publish(self, draft_media_id: str) -> str:
+        """POST /cgi-bin/freepublish/submit — 把草稿派发到公众号,返 publish_id。
+
+        派发后,文章进入微信审核/发布流程(异步)。
+        """
+        await self._ensure_token()
+        body = {"media_id": draft_media_id}
+        res = await self._api_post("/cgi-bin/freepublish/submit", body)
+        if res.get("errcode") and res["errcode"] != 0:
+            raise WeChatUploadError(
+                f"公众号 freepublish/submit 失败: errcode={res.get('errcode')} errmsg={res.get('errmsg')}"
+            )
+        if "publish_id" not in res:
+            raise WeChatUploadError(
+                f"公众号 freepublish/submit 返无 publish_id: {json.dumps(res)[:200]}"
+            )
+        return res["publish_id"]
+
+    async def query_publish_status(self, publish_id: str) -> Dict[str, Any]:
+        """POST /cgi-bin/freepublish/get — 查派发后的状态。
+
+        publish_status:
+          0=成功(已发布)
+          1=发布中
+          2=原创审核中
+          3=参数错误(不会到这里,submit 阶段会抛)
+          4=失败(发布未通过)
+        """
+        await self._ensure_token()
+        body = {"publish_id": publish_id}
+        res = await self._api_post("/cgi-bin/freepublish/get", body)
+        if res.get("errcode") and res["errcode"] != 0:
+            raise WeChatUploadError(
+                f"公众号 freepublish/get 失败: errcode={res.get('errcode')} errmsg={res.get('errmsg')}"
+            )
+        return res
+
+    async def publish_article_full_auto(
+        self,
+        title: str,
+        body_html: str,
+        cover_image_path: str,
+        *,
+        poll_interval: float = 2.0,
+        poll_timeout: float = 30.0,
+    ) -> Dict[str, Any]:
+        """一键全流程:uploadimg(×N) → 草稿 → 派发 → 轮询 → 返结果。
+
+        终态返回:
+          - {status: "published", article_url, freepublish_status: 0, ...}
+          - {status: "failed", error_message, ...}
+          - {status: "freepublish_submitted", freepublish_status: 1, error_message 含 "timed out", ...}
+        """
+        import asyncio
+        from app.services.wechat_cdn import (
+            extract_img_urls,
+            rewrite_html_with_cdn,
+            download_image,
+            get_inline_dir,
+        )
+
+        result: Dict[str, Any] = {
+            "status": "failed",
+            "platform_publish_id": None,
+            "article_url": None,
+            "draft_media_id": None,
+            "freepublish_id": None,
+            "freepublish_status": None,
+            "thumb_media_id": None,
+            "body_html": body_html,
+            "error_message": None,
+        }
+
+        # 1. 基础校验
+        if not title or len(title) > 64:
+            result["error_message"] = f"公众号标题 1-64 字,实际 {len(title)}"
+            return result
+        if not body_html:
+            result["error_message"] = "公众号 content 不能为空"
+            return result
+        if not cover_image_path or not Path(cover_image_path).exists():
+            result["error_message"] = f"封面图不存在: {cover_image_path}"
+            return result
+
+        # 2. token
+        try:
+            await self._ensure_token()
+        except WeChatUploadError as e:
+            result["error_message"] = str(e)
+            return result
+
+        # 3. 上传正文图片到微信 CDN
+        src_urls = extract_img_urls(body_html)
+        src_to_mmbiz: Dict[str, str] = {}
+        temp_paths: List[str] = []
+        if src_urls:
+            inline_dir = get_inline_dir()
+            for src in src_urls:
+                try:
+                    local = await download_image(src, inline_dir)
+                    temp_paths.append(local)
+                    mmbiz = await self._upload_inline_image(local)
+                    src_to_mmbiz[src] = mmbiz
+                except WeChatUploadError as e:
+                    # 清理临时
+                    for p in temp_paths:
+                        try:
+                            Path(p).unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                    result["error_message"] = (
+                        f"正文图床上传失败: {e} (src={src!r})"
+                    )
+                    return result
+
+        # 改写 body HTML
+        rewritten_html = rewrite_html_with_cdn(body_html, src_to_mmbiz)
+        result["body_html"] = rewritten_html
+
+        # 4. 上传封面(永久素材)
+        try:
+            up = await self._upload_image_material(cover_image_path)
+        except WeChatUploadError as e:
+            for p in temp_paths:
+                try:
+                    Path(p).unlink(missing_ok=True)
+                except Exception:
+                    pass
+            result["error_message"] = f"封面上传失败: {e}"
+            return result
+        if up.get("errcode") and up["errcode"] != 0:
+            for p in temp_paths:
+                try:
+                    Path(p).unlink(missing_ok=True)
+                except Exception:
+                    pass
+            result["error_message"] = (
+                f"封面上传失败: errcode={up.get('errcode')} errmsg={up.get('errmsg')}"
+            )
+            return result
+        thumb_media_id = up.get("media_id", "")
+        result["thumb_media_id"] = thumb_media_id
+
+        # 5. 写草稿
+        draft_body = {
+            "title": title,
+            "content": rewritten_html,
+            "content_source_url": "",
+            "need_open_comment": 0,
+            "only_fans_can_comment": 0,
+        }
+        if thumb_media_id:
+            draft_body["thumb_media_id"] = thumb_media_id
+        try:
+            draft_res = await self._api_post("/cgi-bin/draft/add", draft_body)
+        except WeChatUploadError as e:
+            for p in temp_paths:
+                try:
+                    Path(p).unlink(missing_ok=True)
+                except Exception:
+                    pass
+            result["error_message"] = f"draft/add 失败: {e}"
+            return result
+        if "media_id" not in draft_res:
+            for p in temp_paths:
+                try:
+                    Path(p).unlink(missing_ok=True)
+                except Exception:
+                    pass
+            result["error_message"] = (
+                f"公众号 draft/add 失败: errcode={draft_res.get('errcode')} "
+                f"errmsg={draft_res.get('errmsg')}"
+            )
+            return result
+        draft_media_id = draft_res["media_id"]
+        result["draft_media_id"] = draft_media_id
+
+        # 6. 派发发布
+        try:
+            publish_id = await self.submit_for_publish(draft_media_id)
+        except WeChatUploadError as e:
+            for p in temp_paths:
+                try:
+                    Path(p).unlink(missing_ok=True)
+                except Exception:
+                    pass
+            result["error_message"] = f"freepublish/submit 失败: {e}"
+            return result
+        result["freepublish_id"] = publish_id
+        result["platform_publish_id"] = publish_id
+
+        # 7. 轮询 freepublish/get,直到 status==0/3/4 或超时
+        start = time.time()
+        final_status: Optional[int] = None
+        article_url: Optional[str] = None
+        while time.time() - start < poll_timeout:
+            try:
+                st = await self.query_publish_status(publish_id)
+            except WeChatUploadError as e:
+                log.warning("freepublish/get 失败: %s,继续轮询", e)
+                await asyncio.sleep(poll_interval)
+                continue
+            final_status = st.get("publish_status")
+            article_url = st.get("article_url")
+            if final_status == 0:
+                break  # 成功
+            if final_status in (3, 4):
+                break  # 终态失败
+            await asyncio.sleep(poll_interval)
+
+        # 8. 清理临时文件(成功失败都清)
+        for p in temp_paths:
+            try:
+                Path(p).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        result["freepublish_status"] = final_status
+        result["article_url"] = article_url
+
+        if final_status == 0:
+            result["status"] = "published"
+        elif final_status in (3, 4):
+            result["status"] = "failed"
+            result["error_message"] = (
+                f"公众号发布失败: publish_status={final_status} (fail_idx={article_url!r})"
+            )
+        else:
+            # 仍审核中
+            result["status"] = "freepublish_submitted"
+            result["error_message"] = (
+                f"freepublish timed out after {poll_timeout}s; "
+                "公众号后台可见进度"
+            )
+        return result

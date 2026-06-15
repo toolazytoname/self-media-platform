@@ -88,3 +88,123 @@ async def test_run_due_tasks_skips_completed(fresh_store):
     loop = SchedulerLoop(interval_seconds=1)
     executed = await loop._run_due_tasks()
     assert executed == 0
+
+
+# ============ P0-1: 公众号 publish_wechat_now ============
+
+@pytest.mark.asyncio
+async def test_publish_wechat_now_happy_path(fresh_store, tmp_path):
+    """完整 content + account + image_id,adapter mock 成功 → record 含新字段 + content.status=published"""
+    cover_local = tmp_path / "cover.jpg"
+    cover_local.write_bytes(b"\xff\xd8\xff\xe0cover")
+    image = store.add_image({
+        "prompt": "p", "image_url": str(cover_local),  # 已是本地路径
+        "is_mock": False,
+    })
+    content = store.add_content({
+        "title": "图文", "body": "<p>x</p>", "tags": [],
+        "platform": "wechat", "image_id": image["id"],
+    })
+    account = store.add_account({
+        "platform": "wechat", "name": "wx1",
+        "app_id": "wx_x", "app_secret": "sec",
+    })
+
+    fake_adapter = MagicMock()
+    fake_adapter.publish_article_full_auto = AsyncMock(return_value={
+        "status": "published",
+        "platform_publish_id": "pid_001",
+        "draft_media_id": "draft_001",
+        "freepublish_id": "pid_001",
+        "freepublish_status": 0,
+        "article_url": "https://mp.weixin.qq.com/s?ok",
+        "thumb_media_id": "thumb_001",
+        "body_html": "<p>x</p>",
+    })
+
+    with patch("app.platforms.wechat.WeChatAdapter", return_value=fake_adapter):
+        loop = SchedulerLoop(interval_seconds=1)
+        result = await loop.publish_wechat_now(
+            content_id=content["id"], account_id=account["id"],
+        )
+
+    assert result["status"] == "published"
+    assert result["url"] == "https://mp.weixin.qq.com/s?ok"
+    assert result["freepublish_id"] == "pid_001"
+    assert result["draft_media_id"] == "draft_001"
+    # 验证 publish_record 持久化
+    recs = [r for r in store.publish_records if r["content_id"] == content["id"]]
+    assert len(recs) == 1
+    rec = recs[0]
+    assert rec["status"] == "published"
+    assert rec["url"] == "https://mp.weixin.qq.com/s?ok"
+    assert rec["freepublish_id"] == "pid_001"
+    assert rec["draft_media_id"] == "draft_001"
+    assert rec["freepublish_status"] == 0
+    # content 状态更新
+    assert store.get_content(content["id"])["status"] == "published"
+
+
+@pytest.mark.asyncio
+async def test_publish_wechat_now_missing_cover_returns_failed(fresh_store, tmp_path):
+    """content 没 image_id,也没 image_url → 返 failed,不调 adapter"""
+    content = store.add_content({
+        "title": "无封面", "body": "<p>x</p>", "tags": [],
+        "platform": "wechat",
+        # 故意没有 image_id 也没 image_url
+    })
+    account = store.add_account({
+        "platform": "wechat", "name": "wx1",
+        "app_id": "wx", "app_secret": "sec",
+    })
+    fake_adapter = MagicMock()
+    fake_adapter.publish_article_full_auto = AsyncMock()
+
+    with patch("app.platforms.wechat.WeChatAdapter", return_value=fake_adapter):
+        loop = SchedulerLoop(interval_seconds=1)
+        result = await loop.publish_wechat_now(
+            content_id=content["id"], account_id=account["id"],
+        )
+
+    assert result["status"] == "failed"
+    assert "封面" in result.get("error_message", "")
+    # adapter 一次都没调
+    assert fake_adapter.publish_article_full_auto.call_count == 0
+    # record 失败记录
+    recs = [r for r in store.publish_records if r["content_id"] == content["id"]]
+    assert recs[0]["status"] == "failed"
+    # content 状态不变
+    assert store.get_content(content["id"])["status"] != "published"
+
+
+@pytest.mark.asyncio
+async def test_publish_wechat_now_adapter_raises(fresh_store, tmp_path):
+    """adapter 抛异常 → record.status=failed,error_message 写入"""
+    cover_local = tmp_path / "cover.jpg"
+    cover_local.write_bytes(b"\xff\xd8\xff\xe0c")
+    image = store.add_image({"image_url": str(cover_local), "is_mock": False})
+    content = store.add_content({
+        "title": "T", "body": "<p>x</p>", "platform": "wechat",
+        "image_id": image["id"],
+    })
+    account = store.add_account({
+        "platform": "wechat", "name": "w", "app_id": "a", "app_secret": "b",
+    })
+
+    fake_adapter = MagicMock()
+    fake_adapter.publish_article_full_auto = AsyncMock(
+        side_effect=Exception("公众号 token 获取失败: 40013 invalid appid"),
+    )
+
+    with patch("app.platforms.wechat.WeChatAdapter", return_value=fake_adapter):
+        loop = SchedulerLoop(interval_seconds=1)
+        result = await loop.publish_wechat_now(
+            content_id=content["id"], account_id=account["id"],
+        )
+
+    assert result["status"] == "failed"
+    assert "40013" in result["error_message"]
+    recs = [r for r in store.publish_records if r["content_id"] == content["id"]]
+    assert recs[0]["status"] == "failed"
+    # content 不回滚到 published
+    assert store.get_content(content["id"])["status"] != "published"

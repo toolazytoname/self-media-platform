@@ -1,6 +1,7 @@
 # 平台管理 API
 import os
 import shutil
+import asyncio
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -8,6 +9,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from app.store import store
+from app.platforms.sau_base import resolve_sau_bin, SauUploadError, SauCLIAdapter
 from app.core.config import settings
 from app.platforms.base import PlatformType, ContentType, PublishStatus
 from app.platforms import supported_platforms
@@ -54,6 +56,12 @@ class PublishNowRequest(BaseModel):
     platform: str
     account_id: str
     video_id: str
+
+
+class WeChatPublishNowRequest(BaseModel):
+    """P0-1: 公众号全自动图文发布(端到端)。"""
+    content_id: str
+    account_id: str
 
 
 # ============ 路由 ============
@@ -159,6 +167,30 @@ async def publish_now(req: PublishNowRequest):
     return result
 
 
+@router.post("/publish-article-now")
+async def publish_article_now(req: WeChatPublishNowRequest):
+    """P0-1: 公众号全自动图文发布(图文混排 + 端到端)。
+
+    走 scheduler_loop.publish_wechat_now,独立于视频 _dispatch_task。
+    阻塞轮询 30s,返 {status, url, article_url, draft_media_id, freepublish_id, ...}。
+    """
+    account = store.get_account(req.account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if account.get("platform") != "wechat":
+        raise HTTPException(
+            status_code=400,
+            detail=f"该账号不是公众号类型: platform={account.get('platform')}",
+        )
+    content = store.get_content(req.content_id)
+    if not content:
+        raise HTTPException(status_code=404, detail="Content not found")
+    from app.services.scheduler_loop import scheduler_loop
+    return await scheduler_loop.publish_wechat_now(
+        content_id=req.content_id, account_id=req.account_id,
+    )
+
+
 @router.get("/publish/records")
 async def list_publish_records(status: Optional[str] = None):
     """列出发布记录"""
@@ -179,11 +211,14 @@ async def sau_status(account_id: Optional[str] = None):
     """健康检查: sau 是否装、版本、默认 cookie 路径等。
     帮前端 Settings / PublishRecords 提示用户该跑什么命令。
     """
-    from app.platforms.douyin import _resolve_sau_bin
-    sau_bin = _resolve_sau_bin(getattr(settings, "DOUYIN_SAU_BIN", "sau"))
+    sau_bin = resolve_sau_bin(getattr(settings, "DOUYIN_SAU_BIN", "sau"))
     info: Dict[str, Any] = {
         "sau_installed": bool(sau_bin),
         "sau_bin": sau_bin,
+        "sau_supported_platforms": [
+            "douyin", "xiaohongshu", "kuaishou", "bilibili",  # 走 sau CLI
+            # 视频号走 tencent_uploader 库,无 CLI
+        ],
         "videos_dir": settings.VIDEOS_DIR,
         "cookies_dir": settings.COOKIES_DIR,
         "default_account": settings.DOUYIN_DEFAULT_ACCOUNT,
@@ -207,4 +242,94 @@ async def sau_status(account_id: Optional[str] = None):
         default_cookie = str(Path(settings.COOKIES_DIR) / f"{settings.DOUYIN_DEFAULT_ACCOUNT}.json")
         info["cookie_path"] = default_cookie
         info["cookie_exists"] = Path(default_cookie).is_file()
+
+    # 如果有 sau 二进制,顺便抓版本号(异步,失败不阻塞)
+    if sau_bin:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                sau_bin, "--version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5.0)
+            info["sau_version"] = (stdout.decode("utf-8", errors="ignore") or "").strip().split("\n")[0]
+        except Exception:
+            info["sau_version"] = None
     return info
+
+
+class SauLoginRequest(BaseModel):
+    """触发 sau login 子进程(浏览器扫码登录)。"""
+    platform: str = Field(..., description="douyin / xiaohongshu / kuaishou / bilibili")
+    account_name: str = Field(..., description="账号名,对应 cookie 文件名")
+
+
+@router.post("/sau/login")
+async def sau_start_login(req: SauLoginRequest) -> Dict[str, Any]:
+    """C 阶段:触发 sau <platform> login 子进程,用户去 Mac 屏幕看浏览器扫码。
+
+    异步 spawn,不等待(登录是交互的,用户必须看见窗口);
+    前端轮询 GET /sau/login-status 确认 cookie 落盘。
+    """
+    sau_bin = resolve_sau_bin(getattr(settings, "DOUYIN_SAU_BIN", "sau"))
+    if not sau_bin:
+        raise HTTPException(
+            status_code=503,
+            detail="未安装 sau。请先跑 `pipx install social-auto-upload`",
+        )
+    if req.platform not in ("douyin", "xiaohongshu", "kuaishou", "bilibili"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"平台 {req.platform} 不走 sau CLI,不支持此接口。视频号/公众号走其他路径。",
+        )
+
+    cmd = [sau_bin, req.platform, "login", "--account", req.account_name]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=f"启动 sau 失败: {e}")
+
+    expected_cookie = str(Path(settings.COOKIES_DIR) / f"{req.account_name}.json")
+    return {
+        "pid": proc.pid,
+        "cmd": " ".join(cmd),
+        "expected_cookie_path": expected_cookie,
+        "check_command": f"{sau_bin} {req.platform} check --account {req.account_name}",
+        "note": "请看屏幕上的浏览器窗口扫码。cookie 落盘后查 sau/login-status。",
+    }
+
+
+@router.get("/sau/login-status")
+async def sau_login_status(platform: str, account_name: str) -> Dict[str, Any]:
+    """轮询 cookie 是否落盘 + sau check 是否通过。"""
+    sau_bin = resolve_sau_bin(getattr(settings, "DOUYIN_SAU_BIN", "sau"))
+    cookie_path = str(Path(settings.COOKIES_DIR) / f"{account_name}.json")
+    cookie_exists = Path(cookie_path).is_file()
+    authenticated = False
+    check_stdout_tail: List[str] = []
+
+    if sau_bin and cookie_exists:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                sau_bin, platform, "check", "--account", account_name,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10.0)
+            check_stdout_tail = (stdout.decode("utf-8", errors="ignore") or "").strip().splitlines()[-5:]
+            authenticated = proc.returncode == 0
+        except Exception as e:
+            check_stdout_tail = [f"check failed: {e}"]
+
+    return {
+        "platform": platform,
+        "account_name": account_name,
+        "cookie_path": cookie_path,
+        "cookie_exists": cookie_exists,
+        "authenticated": authenticated,
+        "check_tail": check_stdout_tail,
+    }

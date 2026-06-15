@@ -18,6 +18,9 @@ export type PublishStatus =
   | 'pending'
   | 'scheduled'
   | 'uploading'
+  | 'publishing'           // P0-1: 公众号派发中
+  | 'draft_added'          // P0-1: 公众号草稿已写入(API 流里内部态)
+  | 'freepublish_submitted'// P0-1: 公众号派发已提交,等待审核
   | 'published'
   | 'failed'
 
@@ -34,6 +37,12 @@ export interface PublishRecord {
   attempted_at?: string | null
   video_id?: string | null
   account_id?: string | null
+  // P0-1 公众号新字段
+  article_url?: string | null       // 公众号文章 URL(同 url,但语义明确)
+  draft_media_id?: string | null    // 草稿 id
+  freepublish_id?: string | null    // 派发 id
+  freepublish_status?: number | null // 0=成功 1=审核中 2=原创 3=参数 4=失败
+  thumb_media_id?: string | null    // 永久素材 id(封面)
   created_at: string
   executed_at?: string
 }
@@ -52,6 +61,24 @@ export interface PublishNowResponse {
   platform_publish_id?: string
   url?: string
   error?: string
+}
+
+// P0-1: 公众号全自动图文发布参数/响应
+export interface PublishWechatParams {
+  content_id: string
+  account_id: string
+}
+
+export interface PublishWechatResponse {
+  status: 'published' | 'failed' | 'freepublish_submitted'
+  url?: string | null                // 公众号文章 URL(成功时)
+  platform_publish_id?: string | null
+  draft_media_id?: string | null
+  freepublish_id?: string | null
+  freepublish_status?: number | null
+  thumb_media_id?: string | null
+  error_message?: string | null
+  body_html?: string                 // 改写后的 HTML(调试用)
 }
 
 export interface SauStatus {
@@ -86,6 +113,9 @@ export const platformApi = {
     request.post<PublishRecord, PublishRecord>('/platforms/publish', data),
   publishVideo: (data: PublishNowParams) =>
     request.post<PublishNowResponse, PublishNowResponse>('/platforms/publish-now', data),
+  // P0-1: 公众号全自动图文混排发布
+  publishWechatArticle: (data: PublishWechatParams) =>
+    request.post<PublishWechatResponse, PublishWechatResponse>('/platforms/publish-article-now', data),
   listPublishRecords: (status?: string) =>
     request.get<PublishRecord[], PublishRecord[]>('/platforms/publish/records', { params: { status } }),
   getPublishStatus: (id: string) =>

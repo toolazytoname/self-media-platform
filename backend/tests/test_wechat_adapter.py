@@ -242,6 +242,352 @@ class TestNotImplemented:
             ))
 
 
+# ============ P0-1: 上传正文图片 (uploadimg) ============
+
+class TestUploadInlineImage:
+    """POST /cgi-bin/media/uploadimg → mmbiz.qpic.cn URL"""
+
+    def _adapter(self) -> WeChatAdapter:
+        return WeChatAdapter({
+            "platform": "wechat", "name": "test", "id": "acc_1",
+            "app_id": "wx_test", "app_secret": "secret",
+        })
+
+    def test_returns_mmbiz_url(self, tmp_path):
+        img = tmp_path / "inline.jpg"
+        img.write_bytes(b"\xff\xd8\xff\xe0fake-jpeg")
+        responses = {
+            "GET:/cgi-bin/token": {"access_token": "tok", "expires_in": 7200},
+            "POST:/cgi-bin/media/uploadimg": {
+                "url": "https://mmbiz.qpic.cn/mmbiz_png/abc/0?wx_fmt=png",
+            },
+        }
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=_override(responses)):
+            url = asyncio.run(a._upload_inline_image(str(img)))
+        assert url == "https://mmbiz.qpic.cn/mmbiz_png/abc/0?wx_fmt=png"
+
+    def test_error_code_raises(self, tmp_path):
+        img = tmp_path / "inline.jpg"
+        img.write_bytes(b"x")
+        responses = {
+            "GET:/cgi-bin/token": {"access_token": "tok", "expires_in": 7200},
+            "POST:/cgi-bin/media/uploadimg": {"errcode": 45001, "errmsg": "media size out of limit"},
+        }
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=_override(responses)):
+            with pytest.raises(WeChatUploadError, match="45001"):
+                asyncio.run(a._upload_inline_image(str(img)))
+
+
+# ============ P0-1: freepublish/submit ============
+
+class TestSubmitForPublish:
+    """POST /cgi-bin/freepublish/submit → publish_id"""
+
+    def _adapter(self) -> WeChatAdapter:
+        return WeChatAdapter({
+            "platform": "wechat", "name": "test", "id": "acc_1",
+            "app_id": "wx_test", "app_secret": "secret",
+        })
+
+    def test_returns_publish_id(self):
+        responses = {
+            "GET:/cgi-bin/token": {"access_token": "tok", "expires_in": 7200},
+            "POST:/cgi-bin/freepublish/submit": {"publish_id": "1000000001"},
+        }
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=_override(responses)):
+            pid = asyncio.run(a.submit_for_publish("draft_abc"))
+        assert pid == "1000000001"
+
+    def test_error_code_raises(self):
+        responses = {
+            "GET:/cgi-bin/token": {"access_token": "tok", "expires_in": 7200},
+            "POST:/cgi-bin/freepublish/submit": {"errcode": 58000, "errmsg": "freepublish API not enabled"},
+        }
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=_override(responses)):
+            with pytest.raises(WeChatUploadError, match="58000"):
+                asyncio.run(a.submit_for_publish("draft_abc"))
+
+
+# ============ P0-1: freepublish/get (轮询) ============
+
+class TestQueryPublishStatus:
+    """POST /cgi-bin/freepublish/get → publish_status + article_url"""
+
+    def _adapter(self) -> WeChatAdapter:
+        return WeChatAdapter({
+            "platform": "wechat", "name": "test", "id": "acc_1",
+            "app_id": "wx_test", "app_secret": "secret",
+        })
+
+    def test_status_zero_success(self):
+        responses = {
+            "GET:/cgi-bin/token": {"access_token": "tok", "expires_in": 7200},
+            "POST:/cgi-bin/freepublish/get": {
+                "publish_id": "1000000001",
+                "publish_status": 0,  # 成功
+                "article_url": "https://mp.weixin.qq.com/s?__biz=MzA&mid=1&idx=1",
+            },
+        }
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=_override(responses)):
+            res = asyncio.run(a.query_publish_status("1000000001"))
+        assert res["publish_status"] == 0
+        assert "mp.weixin.qq.com/s" in res["article_url"]
+
+    def test_status_four_failure(self):
+        responses = {
+            "GET:/cgi-bin/token": {"access_token": "tok", "expires_in": 7200},
+            "POST:/cgi-bin/freepublish/get": {
+                "publish_id": "1000000001",
+                "publish_status": 4,
+                "fail_idx": [12345678, 12345679],
+            },
+        }
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=_override(responses)):
+            res = asyncio.run(a.query_publish_status("1000000001"))
+        assert res["publish_status"] == 4
+        assert res.get("article_url") is None
+
+
+# ============ P0-1: publish_article_full_auto 端到端 ============
+
+class TestPublishArticleFullAuto:
+    """全流程: token → uploadimg(×N) → material/add → draft/add → freepublish/submit → freepublish/get 轮询"""
+
+    def _adapter(self) -> WeChatAdapter:
+        return WeChatAdapter({
+            "platform": "wechat", "name": "test", "id": "acc_1",
+            "app_id": "wx_test", "app_secret": "secret",
+        })
+
+    def _stub_inline_download(self, tmp_path, count: int = 2):
+        """Stub wechat_cdn.download_image:不真下载,直接返回已存在的本地文件路径。"""
+        files = []
+        for i in range(count):
+            p = tmp_path / f"inline_{i}.jpg"
+            p.write_bytes(b"\xff\xd8\xff\xe0fake")
+            files.append(str(p))
+
+        async def fake_download(url, dest_dir, **kw):
+            # round-robin: 传几次 URL 拿几次
+            if not hasattr(fake_download, "idx"):
+                fake_download.idx = 0
+            p = files[fake_download.idx % len(files)]
+            fake_download.idx += 1
+            return p
+
+        return files, fake_download
+
+    def test_happy_path_with_two_inline_images(self, tmp_path):
+        cover = tmp_path / "cover.jpg"
+        cover.write_bytes(b"\xff\xd8\xff\xe0cover")
+
+        responses = {
+            "GET:/cgi-bin/token": {"access_token": "tok", "expires_in": 7200},
+            "POST:/cgi-bin/media/uploadimg": {"url": "https://mmbiz.qpic.cn/inline_x"},
+            "POST:/cgi-bin/material/add_material": {"media_id": "media_thumb"},
+            "POST:/cgi-bin/draft/add": {"media_id": "draft_xyz"},
+            "POST:/cgi-bin/freepublish/submit": {"publish_id": "1000000099"},
+            # 第一次 get 返 status=1(审核中),第二次返 0(成功)+ article_url
+            "POST:/cgi-bin/freepublish/get:0": {
+                "publish_id": "1000000099", "publish_status": 1,
+            },
+            "POST:/cgi-bin/freepublish/get:1": {
+                "publish_id": "1000000099", "publish_status": 0,
+                "article_url": "https://mp.weixin.qq.com/s?__biz=MzA&mid=99&idx=1",
+            },
+        }
+
+        # 用 sequence 化 override:freepublish/get 第一次返 1,第二次返 0
+        get_calls = {"n": 0}
+
+        async def override(method, url, **kw):
+            url_str = str(url)
+            if "/cgi-bin/token" in url_str:
+                return responses["GET:/cgi-bin/token"]
+            if "/cgi-bin/media/uploadimg" in url_str:
+                return {"url": f"https://mmbiz.qpic.cn/inline_{get_calls.setdefault('inline', 0) or get_calls.__setitem__('inline', get_calls['inline']+1)}"}
+            if "/cgi-bin/material/add_material" in url_str:
+                return responses["POST:/cgi-bin/material/add_material"]
+            if "/cgi-bin/draft/add" in url_str:
+                return responses["POST:/cgi-bin/draft/add"]
+            if "/cgi-bin/freepublish/submit" in url_str:
+                return responses["POST:/cgi-bin/freepublish/submit"]
+            if "/cgi-bin/freepublish/get" in url_str:
+                idx = get_calls.setdefault("get", 0)
+                get_calls["get"] = idx + 1
+                if idx == 0:
+                    return {"publish_id": "1000000099", "publish_status": 1}
+                return responses["POST:/cgi-bin/freepublish/get:1"]
+            return {}
+
+        _files, fake_dl = self._stub_inline_download(tmp_path, count=2)
+
+        body_html = (
+            '<p>正文</p>'
+            '<img src="https://orig.example/1.jpg"/>'
+            '<img src="https://orig.example/2.jpg"/>'
+        )
+
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=override):
+            with patch("app.services.wechat_cdn.download_image", new=fake_dl):
+                with patch("asyncio.sleep", new=AsyncMock()):  # 快进轮询
+                    result = asyncio.run(a.publish_article_full_auto(
+                        title="测试图文",
+                        body_html=body_html,
+                        cover_image_path=str(cover),
+                        poll_interval=0.01, poll_timeout=2.0,
+                    ))
+
+        assert result["status"] == "published"
+        assert result["platform_publish_id"] == "1000000099"
+        assert result["draft_media_id"] == "draft_xyz"
+        assert result["freepublish_id"] == "1000000099"
+        assert result["freepublish_status"] == 0
+        assert "mp.weixin.qq.com" in result["article_url"]
+        assert result["thumb_media_id"] == "media_thumb"
+        # 验证 HTML 被改写
+        assert "mmbiz.qpic.cn" in result["body_html"]
+
+    def test_no_inline_images_skips_uploadimg(self, tmp_path):
+        cover = tmp_path / "cover.jpg"
+        cover.write_bytes(b"\xff\xd8\xff\xe0c")
+
+        called = {"uploadimg": 0}
+
+        async def override(method, url, **kw):
+            url_str = str(url)
+            if "/cgi-bin/token" in url_str:
+                return {"access_token": "tok", "expires_in": 7200}
+            if "/cgi-bin/media/uploadimg" in url_str:
+                called["uploadimg"] += 1
+                return {"url": "https://mmbiz.qpic.cn/x"}
+            if "/cgi-bin/material/add_material" in url_str:
+                return {"media_id": "thumb"}
+            if "/cgi-bin/draft/add" in url_str:
+                return {"media_id": "draft_no_img"}
+            if "/cgi-bin/freepublish/submit" in url_str:
+                return {"publish_id": "pid_no_img"}
+            if "/cgi-bin/freepublish/get" in url_str:
+                return {"publish_id": "pid_no_img", "publish_status": 0,
+                        "article_url": "https://mp.weixin.qq.com/s?ok"}
+            return {}
+
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=override):
+            with patch("asyncio.sleep", new=AsyncMock()):
+                result = asyncio.run(a.publish_article_full_auto(
+                    title="纯文字文章",
+                    body_html="<p>无图</p>",
+                    cover_image_path=str(cover),
+                    poll_interval=0.01, poll_timeout=2.0,
+                ))
+
+        assert result["status"] == "published"
+        assert called["uploadimg"] == 0  # 上传图床没被调
+
+    def test_publish_status_4_returns_failed(self, tmp_path):
+        cover = tmp_path / "cover.jpg"
+        cover.write_bytes(b"\xff\xd8\xff\xe0c")
+
+        async def override(method, url, **kw):
+            url_str = str(url)
+            if "/cgi-bin/token" in url_str:
+                return {"access_token": "tok", "expires_in": 7200}
+            if "/cgi-bin/material/add_material" in url_str:
+                return {"media_id": "thumb"}
+            if "/cgi-bin/draft/add" in url_str:
+                return {"media_id": "draft_fail"}
+            if "/cgi-bin/freepublish/submit" in url_str:
+                return {"publish_id": "pid_fail"}
+            if "/cgi-bin/freepublish/get" in url_str:
+                return {"publish_id": "pid_fail", "publish_status": 4, "fail_idx": [99]}
+            return {}
+
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=override):
+            with patch("asyncio.sleep", new=AsyncMock()):
+                result = asyncio.run(a.publish_article_full_auto(
+                    title="会失败的文章",
+                    body_html="<p>x</p>",
+                    cover_image_path=str(cover),
+                    poll_interval=0.01, poll_timeout=2.0,
+                ))
+
+        assert result["status"] == "failed"
+        assert result["freepublish_status"] == 4
+        assert result.get("article_url") is None
+        assert result.get("error_message")
+
+    def test_poll_timeout_returns_freepublish_submitted(self, tmp_path):
+        cover = tmp_path / "cover.jpg"
+        cover.write_bytes(b"\xff\xd8\xff\xe0c")
+
+        async def override(method, url, **kw):
+            url_str = str(url)
+            if "/cgi-bin/token" in url_str:
+                return {"access_token": "tok", "expires_in": 7200}
+            if "/cgi-bin/material/add_material" in url_str:
+                return {"media_id": "thumb"}
+            if "/cgi-bin/draft/add" in url_str:
+                return {"media_id": "draft_slow"}
+            if "/cgi-bin/freepublish/submit" in url_str:
+                return {"publish_id": "pid_slow"}
+            if "/cgi-bin/freepublish/get" in url_str:
+                # 永远返 status=1(审核中) — 不可能到 0
+                return {"publish_id": "pid_slow", "publish_status": 1}
+            return {}
+
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=override):
+            # 不 mock sleep — poll_timeout=0.05 让循环只跑一次就超时
+            result = asyncio.run(a.publish_article_full_auto(
+                title="慢发布",
+                body_html="<p>x</p>",
+                cover_image_path=str(cover),
+                poll_interval=0.5, poll_timeout=0.05,
+            ))
+
+        assert result["status"] == "freepublish_submitted"
+        assert result["freepublish_id"] == "pid_slow"
+        assert result["freepublish_status"] == 1
+        assert result.get("article_url") is None
+        assert "timed out" in (result.get("error_message") or "").lower()
+
+    def test_inline_image_download_failure_returns_failed(self, tmp_path):
+        cover = tmp_path / "cover.jpg"
+        cover.write_bytes(b"\xff\xd8\xff\xe0c")
+
+        async def fake_download_fail(url, dest_dir, **kw):
+            raise WeChatUploadError(f"下载 {url} 失败: ConnectionError")
+
+        async def override(method, url, **kw):
+            url_str = str(url)
+            if "/cgi-bin/token" in url_str:
+                return {"access_token": "tok", "expires_in": 7200}
+            return {}
+
+        body_html = '<p>正文</p><img src="https://broken.example/1.jpg"/>'
+
+        a = self._adapter()
+        with patch.object(a, "_request_override", new=override):
+            with patch("app.services.wechat_cdn.download_image", new=fake_download_fail):
+                result = asyncio.run(a.publish_article_full_auto(
+                    title="下载失败",
+                    body_html=body_html,
+                    cover_image_path=str(cover),
+                ))
+
+        assert result["status"] == "failed"
+        assert "下载" in (result.get("error_message") or "")
+
+
 # ============ helpers ============
 
 def _override(responses: dict):

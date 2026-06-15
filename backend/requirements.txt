@@ -25,6 +25,20 @@ pytest==7.4.4
 pytest-asyncio==0.23.3
 pytest-cov==4.1.0
 
+# Persistence (Phase 6: SQLite write-through cache)
+sqlalchemy>=2.0,<2.1
+aiosqlite>=0.20
+
+
 # Phase 5: NotebookLM 集成(notebooklm-py 走 subprocess,装在 VM / 系统级即可)
 # pipx install "notebooklm-py[browser]"  # 推荐
 # pip install "notebooklm-py[browser]"    # 也可
+
+# PDF 处理(章节切割)— pypdf 纯 Python 库,小且稳
+pypdf>=4.0
+# 部分加密 PDF 走 AES-128/256,pypdf 自身不带,需要 cryptography
+cryptography>=3.1
+
+# P0-1 公众号全自动图文混排:HTML 解析 + 改写 (<img src> → mmbiz URL)
+beautifulsoup4>=4.12
+lxml>=5.0

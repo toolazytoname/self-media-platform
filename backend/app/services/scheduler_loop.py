@@ -290,6 +290,143 @@ class SchedulerLoop:
         task["publish_id"] = publish_record["publish_id"]
         return await self._dispatch_task(task, allow_retry=False)
 
+    # ============================================================
+    # P0-1: 公众号图文立即派发(独立路径,不动视频 _dispatch_task)
+    # ============================================================
+    async def publish_wechat_now(
+        self, content_id: str, account_id: str,
+    ) -> Dict[str, Any]:
+        """公众号图文立即派发端到端。
+
+        流程:
+          1. 查 content + account
+          2. 解析封面:content.image_id → store.get_image → image_url
+             - 本地路径 → 校验后用
+             - http(s):// → wechat_cdn.download_image 落到 STORAGE_DIR/images/wechat_inline/
+             - 没有 → 返 failed "公众号 image-text 强制需要封面图"
+          3. 建 publish_record(status="publishing")
+          4. try: 调 WeChatAdapter.publish_article_full_auto
+          5. update publish_record + (成功时)content.status="published"
+          6. except 全部吞,record 记 failed
+
+        跟视频 _dispatch_task 区别:
+          - 不要 video / cookie_path
+          - 不走 _dispatch_task(那路径假定 upload_video)
+        """
+        from app.platforms.wechat import WeChatAdapter
+        from app.services.wechat_cdn import download_image, get_inline_dir
+
+        content = store.get_content(content_id)
+        account = store.get_account(account_id)
+        if not content:
+            return {"status": "failed", "error_message": f"content {content_id} not found"}
+        if not account:
+            return {"status": "failed", "error_message": f"account {account_id} not found"}
+        if account.get("platform") != "wechat":
+            return {"status": "failed", "error_message": (
+                f"账号 platform={account.get('platform')} 不是公众号"
+            )}
+
+        # 先建 record
+        record = store.add_publish_record({
+            "content_id": content_id,
+            "content_title": content.get("title"),
+            "platform": "wechat",
+            "account_id": account_id,
+            "video_id": None,
+            "scheduled_time": None,
+            "status": "publishing",
+            "attempted_at": datetime.now().isoformat(),
+        })
+
+        result: Dict[str, Any] = {"status": "failed", "error_message": None}
+
+        try:
+            # 解析封面
+            cover_local = self._resolve_wechat_cover(content)
+            if not cover_local:
+                result["error_message"] = "公众号 image-text 强制需要封面图(请在 content 上设 image_id 或 image_url)"
+                store.update_publish_record(record["publish_id"], {
+                    "status": "failed",
+                    "error_message": result["error_message"],
+                })
+                return result
+
+            adapter = WeChatAdapter(account)
+            full_result = await adapter.publish_article_full_auto(
+                title=content.get("title", ""),
+                body_html=content.get("body", ""),
+                cover_image_path=cover_local,
+            )
+            result = full_result
+            # 对外契约统一用 "url"(跟视频流 publish_now 一致),内部 adapter 叫 article_url
+            if "article_url" in result and "url" not in result:
+                result = {**result, "url": result.get("article_url")}
+
+            # 写回 record
+            update: Dict[str, Any] = {
+                "status": full_result["status"],
+                "url": full_result.get("article_url"),
+                "platform_publish_id": full_result.get("platform_publish_id"),
+                "draft_media_id": full_result.get("draft_media_id"),
+                "freepublish_id": full_result.get("freepublish_id"),
+                "freepublish_status": full_result.get("freepublish_status"),
+                "thumb_media_id": full_result.get("thumb_media_id"),
+                "error_message": full_result.get("error_message"),
+                "attempted_at": datetime.now().isoformat(),
+            }
+            store.update_publish_record(record["publish_id"], update)
+
+            # 成功时更新 content
+            if full_result["status"] == "published":
+                store.update_content(content_id, {"status": "published"})
+
+            return result
+
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"[:500]
+            result = {"status": "failed", "error_message": err}
+            try:
+                store.update_publish_record(record["publish_id"], {
+                    "status": "failed",
+                    "error_message": err,
+                    "attempted_at": datetime.now().isoformat(),
+                })
+            except Exception:
+                pass
+            return result
+
+    def _resolve_wechat_cover(self, content: Dict[str, Any]) -> Optional[str]:
+        """从 content 拿封面图本地路径(下载远程 → 本地)。
+
+        优先用 content.image_id → store.images[].image_url
+        否则用 content.thumbnail_url / content.image_url(冗余)
+        """
+        from app.services.wechat_cdn import download_image, get_inline_dir
+        import asyncio
+        from pathlib import Path
+
+        cover_url: Optional[str] = None
+        image_id = content.get("image_id")
+        if image_id:
+            img = store.get_image(image_id)
+            if img:
+                cover_url = img.get("image_url")
+        if not cover_url:
+            cover_url = content.get("thumbnail_url") or content.get("image_url")
+        if not cover_url:
+            return None
+
+        if cover_url.startswith("http://") or cover_url.startswith("https://"):
+            # 远程 → 下载到本地(同步执行,publish_wechat_now 是 async)
+            return asyncio.get_event_loop().run_until_complete(
+                download_image(cover_url, get_inline_dir())
+            )
+        # 本地路径
+        if Path(cover_url).exists():
+            return cover_url
+        return None
+
 
 # -------- helpers --------
 
