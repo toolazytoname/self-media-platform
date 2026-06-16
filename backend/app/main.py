@@ -17,6 +17,7 @@ from app.api import (
     hot,  # P0-2: 选题雷达
     style,  # P1-1: 文风克隆
     metrics,  # P1-2: 数据回流
+    geo,  # P1-3: GEO 优化
 )
 from app.core.config import settings
 from app.services.scheduler_loop import scheduler_loop
@@ -95,6 +96,10 @@ app.include_router(style.router, prefix="/api/style", tags=["文风克隆"])
 
 # P1-2: 数据回流闭环
 app.include_router(metrics.router, prefix="/api/metrics", tags=["数据回流"])
+
+
+# P1-3: GEO 优化
+app.include_router(geo.router, prefix="/api/geo", tags=["GEO优化"])
 
 
 @app.get("/")
