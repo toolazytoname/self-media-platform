@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-06-16 — P1-3 GEO 优化 (Generative Engine Optimization)
+
+- **Commit**: `feat(geo): GEO 优化 6 维评估 + AI 改写 (P1-3)`
+- **范围**: 4 文件 / +519 行
+- **测试**: 15/15 通过 (TDD: RED → GREEN, 修了 str-vs-list bug)
+- **6 维特征**:
+  1. FAQ 结构(段末 Q&A 短答)
+  2. 具体数据(年份/百分比/金额)
+  3. 来源引用(链接 + "据 X 报告")
+  4. 问题词(段首 "什么是/怎么/为什么")
+  5. 段落长度(单段 ≤ 250 字)
+  6. 概念定义("X 是 Y" / "X 指 Y")
+- **关键模块**:
+  - `backend/app/services/geo_service.py` (新) — score / breakdown / checklist
+  - `backend/app/api/geo.py` (新) — 3 端点(check / optimize / checklist)
+  - `backend/app/main.py` — 注册 /api/geo 路由
+- **设计**:
+  - 6 维平权(各约 16.7 分)
+  - optimize 端点返原/优化后 score 对比
+  - system prompt 注入 6 维改写指南
+- **借鉴**: Writesonic 2025 pivot / Focus GEO 12 维
+- **未做**: 前端 UI + 自动抓取 + 数据回流对比 — P2 补齐
+- **累计测试**: 198/198 ✅
+
+---
+
 ## 2026-06-16 — P1-2 数据回流闭环 (MVP)
 
 - **Commit**: `feat(metrics): 数据回流闭环 (P1-2 MVP)`

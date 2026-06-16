@@ -874,6 +874,85 @@ engagement_score = views + likes × 5 + comments × 10
 
 ---
 
+### 15.7 GEO 优化 (P1-3)
+
+> **干什么**:评估 + 改写工具,让内容在 AI 搜索(ChatGPT/DeepSeek/文心/豆包/Kimi)里更可能被推荐。
+> **状态**:**后端 API ✅**(15/15 测试通过)。前端 UI 在 P2 补齐。
+
+#### 6 维评估
+
+| 维度 | 检测内容 | 改进建议 |
+|------|---------|---------|
+| **FAQ 结构** | 含 "FAQ:" / "常见问题" 段 + Q&A 短答对 | 文末加 FAQ 段,列 3-5 个问答 |
+| **具体数据** | 年份 / 百分比 / 金额 | 加 2024 年、增长 30%、1.2 万亿 等可量化 |
+| **来源引用** | http(s) 链接 + "据 X 报告" 词 | 加 1-3 个权威链接 + 引用词 |
+| **问题词** | 段首含 "什么是" / "怎么" / "为什么" | 段首用问题词引导 AI 提取 |
+| **段落长度** | 单段 ≤ 250 字(AI 搜索结果常截短段) | 把长段拆成多段 |
+| **概念定义** | "X 是 Y" / "X 指 Y" 句式 | 关键概念明确定义 |
+
+#### 手动 API 流程
+
+```bash
+# 1. 评估一段文字
+curl -s -X POST http://127.0.0.1:8000/api/geo/check \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"期权是一种金融工具。"}' | python3 -m json.tool
+
+# → {
+#     "score": 12,
+#     "checklist": {
+#       "faq_structure": {"score": 0, "tip": "缺 FAQ 段..."},
+#       "specific_data": {"score": 0, "tip": "..."},
+#       ...
+#     }
+#   }
+
+# 2. AI 改写为 GEO-friendly
+curl -s -X POST http://127.0.0.1:8000/api/geo/optimize \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "期权是一种金融工具,买入方有权利。",
+    "target_score": 80,
+    "provider": "minimax"
+  }' | python3 -m json.tool
+
+# → {
+#     "original_score": 12,
+#     "original_checklist": {...},
+#     "optimized": "【GEO 重写】什么是期权?...",
+#     "optimized_score": 78,
+#     "optimized_checklist": {...}
+#   }
+
+# 3. 拿通用 checklist(教学)
+curl -s http://127.0.0.1:8000/api/geo/checklist \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+```
+
+#### 端点契约
+
+| 端点 | 方法 | 鉴权 | 说明 |
+|------|------|------|------|
+| `/api/geo/check` | POST | ✅ | 评估(score + 6 维 breakdown) |
+| `/api/geo/optimize` | POST | ✅ | AI 改写为 GEO-friendly 版本(返原/优化后 score 对比) |
+| `/api/geo/checklist` | GET | ✅ | 返通用 checklist(空文本参考) |
+
+#### 借鉴
+
+- **Writesonic** 2025 pivot: 行业第一家从"AI 写作"转"GEO 优化"
+- **Focus GEO**: 12 维评估,我们简化到 6 维(MVP 平衡可读性 + 实用性)
+- **AIWriteX**: 集成 GEO 优化到内容发布流
+
+#### 未来扩展
+
+- **AI 中心集成**: `/ai/expand` 改写时可选 `?geo_optimize=true`
+- **数据回流**: GEO 优化版 vs 普通版的"被 AI 推荐"数据对比
+- **前端 UI**: 实时评估条 + 改进建议侧栏
+
+---
+
 ## 16. 配套文档
 
 | 文档 | 说明 |
