@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-06-16 — P0-7 公众号排版引擎 3 主题
+
+- **Commit**: `feat(formatter): 公众号排版引擎 3 主题 (P0-7)`
+- **范围**: 7 文件 / +819 行
+- **测试**: 35/35 通过 (30 formatter + 5 format API)
+- **3 主题**: default(清爽)/ grace(暖色优雅)/ simple(极简黑白)
+- **关键模块**:
+  - `backend/app/services/wechat_formatter.py` (新) — 自实现 markdown 解析 + 3 套 inline-style CSS
+  - `backend/app/api/content.py` — `POST /api/content/format` 预览端点
+  - `backend/app/api/platforms.py` — `WeChatPublishNowRequest` 加 `theme` 字段
+  - `backend/app/platforms/wechat.py` — `publish_article_full_auto(theme='default')` 集成;**自动检测**输入是 HTML 则跳过 formatter
+  - `backend/app/services/scheduler_loop.py` — `publish_wechat_now` 透传 `content.wechat_theme`
+- **设计权衡**:
+  - 用 placeholder 保护 inline 标签防 escape 错位(否则 `<strong>` 会被转义)
+  - 无外部 markdown 库(公众号场景简单)
+  - HTML 输入跳过主题(避免转义 `<img>` 已有标签)
+- **未做**: 前端 UI (Editor 主题切换器 + 实时预览) — API 已可手动调用
+- **累计测试**: 141/141 全部 ✅ (12 weixin_channels + 50 wechat + 30 formatter + 33 hot + 16 adapt)
+
+---
+
 ## 2026-06-16 — P0-10 视频号 (WeChat Channels) Adapter
 
 - **Commit**: `feat(platforms): 视频号 (WeChat Channels) Adapter 注册 (P0-10 快赢)`

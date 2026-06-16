@@ -553,16 +553,22 @@ curl -s -X POST http://127.0.0.1:8000/api/ai/adapt/save \
 
 ```
 Content.body
-   ↓ 1. 解析 <img src="远程URL">
-   ↓ 2. 下载到 STORAGE_DIR/images/wechat_inline/ + 上传 uploadimg
-   ↓ 3. rewrite_html 替换 src 为 mmbiz.qpic.cn URL
-   ↓ 4. material/add_material 上传封面 → 永久素材 thumb_media_id
-   ↓ 5. draft/add 写草稿 → 草稿 id
-   ↓ 6. freepublish/submit 派发 → publish_id
-   ↓ 7. 轮询 freepublish/get,2s 间隔,30s 超时
+   ↓ 1. (P0-7) Markdown → 套主题渲染 → 带 inline-CSS HTML
+   ↓ 2. 解析 <img src="远程URL">
+   ↓ 3. 下载到 STORAGE_DIR/images/wechat_inline/ + 上传 uploadimg
+   ↓ 4. rewrite_html 替换 src 为 mmbiz.qpic.cn URL
+   ↓ 5. material/add_material 上传封面 → 永久素材 thumb_media_id
+   ↓ 6. draft/add 写草稿 → 草稿 id
+   ↓ 7. freepublish/submit 派发 → publish_id
+   ↓ 8. 轮询 freepublish/get,2s 间隔,30s 超时
    ↓
-返回 {status: published, article_url, freepublish_id, ...}
+返回 {status: published, article_url, freepublish_id, theme, ...}
 ```
+
+#### 主题选择(P0-7 集成)
+
+`publish-article-now` 支持 `theme` 字段(default/grace/simple),发布前自动套用。
+若 body 已是 HTML(<p>/<img> 等),**跳过**主题渲染(避免转义已有标签)。
 
 #### 前置:公众号测试号
 
@@ -580,7 +586,7 @@ Content.body
 
 请求:
 ```json
-{ "content_id": "content_xxx", "account_id": "acc_xxx" }
+{ "content_id": "content_xxx", "account_id": "acc_xxx", "theme": "grace" }
 ```
 
 响应(成功):
@@ -593,6 +599,7 @@ Content.body
   "freepublish_id": "100000_xxx",
   "freepublish_status": 0,
   "thumb_media_id": "media_xxx",
+  "theme": "grace",
   "error_message": null
 }
 ```
@@ -608,6 +615,83 @@ Content.body
 #### 失败重试
 
 发布记录存在 `store.publish_records`,有 `freepublish_id`。30s 超时的情况:等几分钟后手动查 `GET /api/platforms/status/<publish_id>` 看是否最终成功。
+
+---
+
+### 15.4 公众号排版引擎 3 主题 (P0-7)
+
+> **干什么**:Markdown → 微信兼容 HTML,3 套主题(default/grace/simple),**所有 CSS inline**(公众号会过滤 `<style>` 标签)。
+> **状态**:**后端 API ✅**(35/35 测试通过)。前端 UI 在 P1 补齐(API 已可手动调用)。
+
+#### 主题选择
+
+| 主题 | 风格 | 适合 |
+|------|------|------|
+| **default(清爽)** | 黑白灰、h1 下边线、h2 左边线、blockquote 浅灰 | 通用科技/商业文 |
+| **grace(优雅)** | 暖色调 (#722 / #c37)、h1 dashed 下边线居中、h2 渐变背景 | 文艺 / 生活方式 / 情感文 |
+| **simple(极简)** | 纯黑/灰、h1 加粗无装饰、blockquote 极细边 | 短消息 / 通知 / 极简风 |
+
+#### 手动 API 流程
+
+```bash
+# 1. 预览(不需要保存,纯渲染)
+curl -s -X POST http://127.0.0.1:8000/api/content/format \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "body": "# 期权入门\n\n## 什么是期权\n\n期权是**衍生品**...\n\n> 重要:杠杆高,风险大",
+    "theme": "grace"
+  }' | python3 -m json.tool
+
+# → {
+#     "theme": "grace",
+#     "theme_name": "优雅",
+#     "body_chars": 30,
+#     "html": "<h1 style='...'>期权入门</h1>...",
+#     "html_chars": 380
+#   }
+
+# 2. (推荐) 直接发布到公众号,带 theme
+curl -s -X POST http://127.0.0.1:8000/api/platforms/publish-article-now \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content_id": "content_xxx",
+    "account_id": "acc_yyy",
+    "theme": "grace"
+  }' | python3 -m json.tool
+```
+
+#### 支持的 Markdown 元素
+
+| 元素 | 支持 | 例 |
+|------|------|-----|
+| 标题 | ✅ | `# H1` `## H2` `### H3` |
+| 加粗 / 斜体 | ✅ | `**bold**` / `*italic*` |
+| 链接 | ✅ | `[文字](https://...)` |
+| 图片 | ✅ | `![alt](https://mmbiz.qpic.cn/...)` |
+| 列表 | ✅ | `- item` / `* item` |
+| 引用块 | ✅ | `> quote` |
+| inline code | ✅ | `` `code` `` |
+| 代码块 | ✅ | ` ```code``` ` |
+| HTML 嵌入 | ⚠️ | 不会 escape 但建议用 markdown |
+| 表格 | ❌ | 不支持(用列表代替) |
+
+#### 设计选择
+
+- **为什么用 placeholder 保护 inline 标签?** 普通 escape 会把 `<strong>` 标签也转义成 `&lt;strong&gt;` 失效。
+- **为什么用纯 Python 解析 markdown?** 公众号场景简单,加 mistune/markdown 库不值。
+- **为什么 3 套主题?** baoyu-post-to-wechat 设计验证 3 套覆盖 80% 场景;更多主题运营成本高。
+- **HTML 输入会跳过主题**:避免转义已有 `<img>` 标签。
+
+#### 端点契约
+
+| 端点 | 方法 | 鉴权 | 说明 |
+|------|------|------|------|
+| `/api/content/format` | POST | ✅ | 预览(不保存),返 theme_name + html |
+| `/api/platforms/publish-article-now` | POST | ✅ | `theme` 字段(P0-7 集成),发布前自动套主题 |
+
+---
 
 ---
 
