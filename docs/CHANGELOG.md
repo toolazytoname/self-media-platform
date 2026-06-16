@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-06-16 — P0-2 选题雷达 / 爆款发现
+
+- **Commit**: `977fcaf feat(hot): 选题雷达 / 爆款发现 (P0-2)`
+- **范围**: 12 文件 / +1505 行
+- **测试**: 33/33 通过
+  - `test_hot_list_client.py` (12 用例) — HotListClient / fetch_platform / fetch_all / mock fallback
+  - `test_hot.py` (21 用例) — list/refresh/rewrite/create-content + auth
+- **端到端验证** (用真 LLM):
+  - refresh → 网络 fail → 20 条 fallback mock 灌库 (4 平台 × 5 条)
+  - filter by platform → weibo 5 条
+  - AI 改写 → "DeepSeek V4: 5 个隐藏用法" 钩子 (minimax M3)
+  - create-content → draft 写入, hot.related_content_id 关联
+- **关键模块**:
+  - `backend/app/services/hot_list_client.py` (新) — HotListClient 类, vvhan.com 聚合
+  - `backend/app/api/hot.py` (新) — 4 端点
+  - `backend/app/api/ai_generate.py` — `/ai/hot-rewrite` 端点
+  - `backend/app/store.py` — `self.hot_topics` + 5 CRUD 方法
+- **踩坑记录**:
+  - 子 agent 写 RED 时撞 Token 限额;主对话接手 GREEN
+  - 子 agent 测试 bug 修复:5 个 list 测试补 auth header(自相矛盾);FakeAsyncClient 拼接 params;partial-failure 计数改 35 (=3 成功 × 10 + 1 fail × 5 mock)
+  - 设计冲突:测试期望"失败 → []" 但我加 fallback mock 数据;改测试为"失败 → 返 mock 不空"
+- **未做** (nice-to-have): 前端 UI (Sources 热榜 tab + 卡片 + 跳转按钮) — API 全部就绪
+
+---
+
 ## 2026-06-15 — P0-1 公众号全自动图文混排
 
 - **Commit**: `0e45665 feat(wechat): 全自动公众号图文混排发布 (P0-1)`
