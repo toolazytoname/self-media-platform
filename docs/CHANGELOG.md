@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-06-16 — P0-10 视频号 (WeChat Channels) Adapter
+
+- **Commit**: `feat(platforms): 视频号 (WeChat Channels) Adapter 注册 (P0-10 快赢)`
+- **范围**: 4 文件 / +282 行
+- **测试**: 12/12 通过
+- **策略**: 快赢 — adapter 已注册到 `_REGISTRY`,前端能选视频号账号;核心 `upload_video` 抛 `WeixinChannelsNotConfiguredError` 提示需扫码 + 集成 `tencent_uploader`(后续 PR 接入)。
+- **关键模块**:
+  - `backend/app/platforms/base.py` — `PlatformType.WEIXIN_CHANNELS` enum
+  - `backend/app/platforms/weixin_channels.py` (新) — `WeixinChannelsAdapter` + `WeixinChannelsNotConfiguredError`
+  - `backend/app/platforms/__init__.py` — 注册到 `_REGISTRY`
+- **平台覆盖**: 5 → 6 (douyin / xiaohongshu / kuaishou / bilibili / wechat / **weixin_channels**)
+- **未做 (下一 PR)**: 集成 `tencent_uploader` 库 + 扫码 cookie 流程
+- **累计测试**: 111/111 ✅ (12 weixin_channels + 50 wechat + 33 hot + 16 adapt)
+
+---
+
 ## 2026-06-16 — P0-3 一稿多发 / 平台改写引擎
 
 - **Commit**: `a4eaf45 feat(ai): 一稿多发 / 平台改写引擎 (P0-3)`
