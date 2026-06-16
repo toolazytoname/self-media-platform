@@ -1,5 +1,5 @@
 """
-平台适配器工厂 — Phase 2
+平台适配器工厂 — Phase 2 + C 阶段 + P0-10
 
 注册表 + `get_adapter(platform_type, account)` 一站式拿实例。
 要加新平台只需:
@@ -11,12 +11,21 @@ from typing import Dict, Type
 from app.platforms.base import PlatformAdapter, PlatformType
 from app.platforms.douyin import DouyinAdapter
 from app.platforms.wechat import WeChatAdapter
+from app.platforms.xiaohongshu import XiaohongshuAdapter
+from app.platforms.kuaishou import KuaishouAdapter
+from app.platforms.bilibili import BilibiliAdapter
+from app.platforms.weixin_channels import WeixinChannelsAdapter  # P0-10
 
-# Phase 2 注册表
+# Phase 2 + C + P0-10 注册表
 _REGISTRY: Dict[PlatformType, Type[PlatformAdapter]] = {
     PlatformType.DOUYIN: DouyinAdapter,
     PlatformType.WECHAT: WeChatAdapter,
-    # 后续:BILIBILI, XIAOHONGSHU, ...
+    # C 阶段:sau CLI 通用基类的 3 个
+    PlatformType.XIAOHONGSHU: XiaohongshuAdapter,
+    PlatformType.KUAISHOU: KuaishouAdapter,
+    PlatformType.BILIBILI: BilibiliAdapter,
+    # P0-10: 视频号(框架注册完成,核心 upload 抛明确错误等扫码+ tencent_uploader)
+    PlatformType.WEIXIN_CHANNELS: WeixinChannelsAdapter,
 }
 
 
@@ -45,4 +54,8 @@ __all__ = [
     "supported_platforms",
     "DouyinAdapter",
     "WeChatAdapter",
+    "XiaohongshuAdapter",
+    "KuaishouAdapter",
+    "BilibiliAdapter",
+    "WeixinChannelsAdapter",  # P0-10
 ]

@@ -12,6 +12,7 @@ class PlatformType(Enum):
     XIAOHONGSHU = "xiaohongshu"
     TOUTIAO = "toutiao"
     WECHAT = "wechat"  # 微信公众号
+    WEIXIN_CHANNELS = "weixin_channels"  # P0-10: 视频号
     TIKTOK = "tiktok"
     KUAISHOU = "kuaishou"
     BAIJIA = "baijia"
