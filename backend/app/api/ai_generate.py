@@ -1,13 +1,43 @@
 # AI 生成 API - 使用 provider 工厂(Phase A)
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 import asyncio
 import time
 from pathlib import Path
 
+from app.core.security import require_user  # P0-3: /ai/adapt/save 需要 auth
+
 router = APIRouter()
+
+
+# ============ P0-3: 平台调性模板(被 /ai/expand /adapt 复用) ============
+# 每个平台的核心约束:字数 + 语气 + 必备元素(emoji/钩子/逻辑等)。
+PLATFORM_TIPS: Dict[str, str] = {
+    "wechat": (
+        "公众号风格:深度长文(3000-5000 字)、专业有观点、有温度、有数据/案例支撑、"
+        "段落清晰、有小标题、避免空话。适合有阅读深度的目标读者。"
+    ),
+    "xiaohongshu": (
+        "小红书风格:500-800 字短笔记,emoji 多用(每段 1-2 个)、分段清晰、"
+        "首图钩子强、口语化闺蜜感、'干货'/'避坑'等关键词、有具体数字。"
+    ),
+    "douyin": (
+        "抖音风格:200-300 字视频脚本,前 3 秒钩子抓人、口语化、有节奏感、"
+        "分镜清晰(画面+字幕+配音)、结尾引导关注/点赞/评论。"
+    ),
+    "zhihu": (
+        "知乎风格:1500-2500 字中长回答,逻辑严谨、有论据链、"
+        "专业术语准确、引用数据/来源、'先说结论'结构、有反思深度。"
+    ),
+}
+
+LENGTH_HINTS: Dict[str, str] = {
+    "short": "整体偏短(快速读完)",
+    "medium": "中等长度(详细但不过分)",
+    "long": "尽量长(深度展开)",
+}
 
 
 # ============ Provider 工厂统一入口(Phase A 改造) ============
@@ -907,3 +937,132 @@ async def hot_rewrite(req: HotRewriteRequest):
         platform=req.platform,
         total=len(angles),
     )
+
+
+# ============ P0-3: 一稿多发 / 平台改写引擎 ============
+# 端点:
+#   POST /ai/adapt        并发调 LLM 出 N 个平台改写 variant(不落库)
+#   POST /ai/adapt/save   把选定的 variant 创建为 draft Content
+# 一稿多发会创建 N 条 Content 行(每平台一条),用 source_topic 关联回原主题。
+
+import logging
+log = logging.getLogger("ai_generate")
+
+
+class AdaptRequest(BaseModel):
+    topic: str = Field(..., min_length=1, max_length=500, description="原始主题")
+    platforms: Optional[List[str]] = Field(
+        None, description="目标平台;None=4 个核心平台 (wechat/xiaohongshu/douyin/zhihu)",
+    )
+    length_hint: str = Field("medium", description="short|medium|long")
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    source_excerpt: Optional[str] = Field(None, max_length=10000)
+
+
+class AdaptVariant(BaseModel):
+    platform: str
+    title: str
+    body: str
+    char_count: int
+
+
+class AdaptResponse(BaseModel):
+    topic: str
+    variants: List[AdaptVariant]
+    failed: List[str] = Field(default_factory=list)
+    elapsed_ms: int
+
+
+@router.post("/adapt", response_model=AdaptResponse)
+async def adapt_to_platforms(req: AdaptRequest, _user=Depends(require_user)):
+    """一稿多发:并发 N 平台改写。返回 variants + failed 列表。需要登录。"""
+    platforms = req.platforms or list(PLATFORM_TIPS.keys())
+    platforms = [p for p in platforms if p in PLATFORM_TIPS]
+    if not platforms:
+        raise HTTPException(400, "no valid platforms specified")
+
+    length_desc = LENGTH_HINTS.get(req.length_hint, LENGTH_HINTS["medium"])
+    t0 = time.time()
+
+    async def adapt_one(platform: str) -> Dict[str, Any]:
+        tip = PLATFORM_TIPS[platform]
+        system = (
+            "你是一稿多发改写专家。用户给一个主题,你要按目标平台调性产出 1 个版本。\n"
+            f"目标平台:{platform}\n"
+            f"调性要求:{tip}\n"
+            f"长度倾向:{length_desc}\n"
+            "输出严格 2 段,第一行是标题,空行后是正文:\n"
+            "TITLE: <不超过 30 字的标题>\n"
+            "BODY:\n<正文>"
+        )
+        user_parts = [f"主题:{req.topic}"]
+        if req.source_excerpt:
+            user_parts.append(f"原文片段:\n{req.source_excerpt[:3000]}")
+        user_parts.append("请产出该平台版本。")
+        user_msg = "\n\n".join(user_parts)
+        raw = await chat_completion(
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_msg},
+            ],
+            model=req.model,
+            provider=req.provider,
+            max_tokens=2048,
+        )
+        title = req.topic[:30]
+        body = raw
+        if "TITLE:" in raw and "BODY:" in raw:
+            head, _, rest = raw.partition("BODY:")
+            title_line = head.split("TITLE:", 1)[-1].strip().splitlines()[0].strip()
+            if title_line:
+                title = title_line[:80]
+            body = rest.strip()
+        return {
+            "platform": platform,
+            "title": title,
+            "body": body,
+            "char_count": len(body),
+        }
+
+    tasks = [adapt_one(p) for p in platforms]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    variants: List[Dict[str, Any]] = []
+    failed: List[str] = []
+    for p, r in zip(platforms, results):
+        if isinstance(r, Exception):
+            log.warning("adapt %s failed: %s", p, r)
+            failed.append(p)
+        else:
+            variants.append(r)
+
+    elapsed = int((time.time() - t0) * 1000)
+    return AdaptResponse(
+        topic=req.topic,
+        variants=[AdaptVariant(**v) for v in variants],
+        failed=failed,
+        elapsed_ms=elapsed,
+    )
+
+
+class AdaptSaveRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    body: str = Field(..., min_length=1)
+    platform: str = Field(..., description="wechat|xiaohongshu|douyin|zhihu")
+    tags: List[str] = Field(default_factory=list)
+    source_topic: Optional[str] = Field(None, description="原主题(可选,用于追踪一稿多发)")
+
+
+@router.post("/adapt/save")
+async def adapt_save(req: AdaptSaveRequest, _user=Depends(require_user)):
+    """把选定 variant 创建为 draft Content(返回 content_id)。"""
+    from app.store import store
+    content = store.add_content({
+        "title": req.title,
+        "body": req.body,
+        "tags": req.tags,
+        "platform": req.platform,
+        "source_topic": req.source_topic,
+        "status": "draft",
+    })
+    return {"content_id": content["id"]}
