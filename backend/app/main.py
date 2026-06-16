@@ -16,6 +16,7 @@ from app.api import (
     sources as sources_api,
     hot,  # P0-2: 选题雷达
     style,  # P1-1: 文风克隆
+    metrics,  # P1-2: 数据回流
 )
 from app.core.config import settings
 from app.services.scheduler_loop import scheduler_loop
@@ -90,6 +91,10 @@ app.include_router(hot.router, prefix="/api/hot", tags=["热榜雷达"])
 
 # P1-1: 去 AI 味 / 文风克隆
 app.include_router(style.router, prefix="/api/style", tags=["文风克隆"])
+
+
+# P1-2: 数据回流闭环
+app.include_router(metrics.router, prefix="/api/metrics", tags=["数据回流"])
 
 
 @app.get("/")

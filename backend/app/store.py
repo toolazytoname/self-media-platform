@@ -52,6 +52,8 @@ class Store:
         self.hot_topics: List[Dict[str, Any]] = []
         # P1-1: 文风画像 (per-user dict, key=user_id, value=StyleProfile)
         self.user_style_profiles: Dict[str, Any] = {}
+        # P1-2: 发布内容数据回流 (per-content dict, key=content_id, value={views, likes, ...})
+        self.publish_metrics: Dict[str, Dict[str, Any]] = {}
 
     # ============ Write-Through Helpers ============
 

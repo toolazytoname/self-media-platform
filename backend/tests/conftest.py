@@ -37,6 +37,8 @@ def fresh_store():
     store.sources.clear()  # Phase 3 — 来源
     store.source_chapters.clear()
     store.hot_topics.clear()  # P0-2: 选题雷达
+    store.user_style_profiles.clear()  # P1-1: 文风画像
+    store.publish_metrics.clear()  # P1-2: 数据回流
     # 重新初始化默认模板
     from app.api.templates import init_default_templates
     init_default_templates()
