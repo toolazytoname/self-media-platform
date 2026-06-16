@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-06-16 — P0-3 一稿多发 / 平台改写引擎
+
+- **Commit**: `a4eaf45 feat(ai): 一稿多发 / 平台改写引擎 (P0-3)`
+- **范围**: 2 文件 / +413 行
+- **测试**: 16/16 通过
+  - `test_adapt.py` (16 用例) — /ai/adapt 4 平台改写 + /ai/adapt/save 落库 + PLATFORM_TIPS 模板
+- **关键设计**:
+  - `PLATFORM_TIPS` 4 平台调性模板 (wechat/xiaohongshu/douyin/zhihu)
+  - `LENGTH_HINTS` (short/medium/long) 注入 system prompt
+  - `asyncio.gather(return_exceptions=True)` 单平台 fail 不阻塞,返 `failed` 列表
+  - 解析 LLM 输出 `TITLE: ... \n BODY: ...` 格式,fallback 用 topic[:30]
+- **端点契约**:
+  - `POST /api/ai/adapt` (no auth, 纯改写) → `{topic, variants: [{platform, title, body, char_count}], failed, elapsed_ms}`
+  - `POST /api/ai/adapt/save` (需 auth) → `{content_id}` (创建 draft Content, 带 source_topic 关联)
+- **未做**: e2e 端到端 (4 并发 LLM 慢, 单测+集成测试已覆盖)
+- **未做 (nice-to-have)**: 前端 UI — AI 中心加"一稿多发" tab + 4 tab preview
+
+---
+
 ## 2026-06-16 — P0-2 选题雷达 / 爆款发现
 
 - **Commit**: `977fcaf feat(hot): 选题雷达 / 爆款发现 (P0-2)`
