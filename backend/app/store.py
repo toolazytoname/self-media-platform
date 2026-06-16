@@ -50,6 +50,8 @@ class Store:
         self.source_chapters: List[Dict[str, Any]] = []
         # P0-2: 选题雷达 / 热榜
         self.hot_topics: List[Dict[str, Any]] = []
+        # P1-1: 文风画像 (per-user dict, key=user_id, value=StyleProfile)
+        self.user_style_profiles: Dict[str, Any] = {}
 
     # ============ Write-Through Helpers ============
 
