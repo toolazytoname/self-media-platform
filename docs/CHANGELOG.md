@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-06-16 — P1-1 去 AI 味 / 文风克隆
+
+- **Commit**: `feat(style): 去 AI 味 / 文风克隆 (P1-1)`
+- **范围**: 5 文件 / +625 行
+- **测试**: 23/23 通过 (TDD: RED → GREEN)
+- **关键模块**:
+  - `backend/app/services/style_profile.py` (新) — StyleProfile 4 维特征 (句长/emoji/段首/词)
+  - `backend/app/api/style.py` (新) — 3 端点 + make_chat_with_style helper
+  - `backend/app/store.py` — `user_style_profiles` per-user dict
+  - `backend/app/main.py` — 注册 /api/style 路由
+- **设计**:
+  - 4 维特征: avg_sentence_len / emoji_rate / opening_patterns (top 3) / vocab (top 10)
+  - 评分 0-100: 句长 40% + emoji 30% + 段首 20% + 词 10%
+  - 软约束 prompt 注入: 调生成时 user prompt 可覆盖
+  - 无外部依赖 (emoji regex + 简化中文停用词)
+- **未做**: AI 端点集成(/ai/expand 还没自动注入)+ 前端 UI — P1.5/P2 补齐
+- **累计测试**: 169/169 ✅
+
+---
+
 ## 2026-06-16 — P0-7 公众号排版引擎 3 主题
 
 - **Commit**: `feat(formatter): 公众号排版引擎 3 主题 (P0-7)`

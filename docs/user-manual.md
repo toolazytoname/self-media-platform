@@ -695,6 +695,97 @@ curl -s -X POST http://127.0.0.1:8000/api/platforms/publish-article-now \
 
 ---
 
+---
+
+### 15.5 去 AI 味 / 文风克隆 (P1-1)
+
+> **干什么**:学用户历史文章的"风格画像"(句长/emoji/段首/口头禅)→ AI 生成时自动模仿 → 评分告诉你"哪里不像"。
+> **状态**:**后端 API ✅**(23/23 测试通过)。前端 UI 在 P2 补齐(API 已可手动调用)。
+
+#### 工作流
+
+```
+1. 用户写 N 篇 Content
+   ↓
+2. POST /api/style/refresh  (分析历史)
+   → 4 维画像:句长 12.5 字 / emoji 0.012 / 段首"其实"、"今天" / 高频词"期权"
+   ↓
+3. (后续) AI 扩写/改写时, 自动注入"风格指令"到 system prompt
+   → LLM 输出自动模仿用户文风
+   ↓
+4. POST /api/style/score {text: "..."}
+   → 返 {score: 78, profile_sample_size: 8, prompt_hint: "..."}
+   → 78 = 高度匹配;50 以下提示"风格不太像"
+```
+
+#### 4 维特征
+
+| 维度 | 例子 | 说明 |
+|------|------|------|
+| **句长分布** | 平均 12.5 字 | < 15 短句口语,15-40 中等,> 40 长文深度 |
+| **emoji 频率** | 0.012 (1.2%) | > 1% 频繁,0.3-1% 偶尔,< 0.3% 几乎不用 |
+| **段首模式** | `["其实", "今天", "很多"]` | top 3 开头短语 |
+| **高频词/口头禅** | `{"期权": 18, "理财": 12, "杠杆": 8}` | top 10 词(去停用词) |
+
+#### 手动 API 流程
+
+```bash
+# 1. 重新分析(基于所有 content body)
+curl -s -X POST http://127.0.0.1:8000/api/style/refresh \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# → {
+#     "avg_sentence_len": 12.5,
+#     "emoji_rate": 0.01234,
+#     "opening_patterns": ["其实", "今天", "很多"],
+#     "vocab": {"期权": 18, "理财": 12, ...},
+#     "sample_size": 8
+#   }
+
+# 2. 取当前画像
+curl -s http://127.0.0.1:8000/api/style/profile \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# 3. 给一段生成内容打 0-100 风格分
+curl -s -X POST http://127.0.0.1:8000/api/style/score \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"其实啊,期权和股票不一样。✨ 锁定价格就是核心。"}' | python3 -m json.tool
+
+# → {
+#     "score": 78,
+#     "profile_sample_size": 8,
+#     "prompt_hint": "【风格指南】\n基于用户 8 篇历史文章学习到以下写作风格...\n- 句长偏短...\n- emoji 频繁..."
+#   }
+```
+
+#### 评分维度(总分 100)
+
+| 维度 | 权重 | 匹配标准 |
+|------|------|---------|
+| **句长** | 40 | 与用户文风句长差 < 20% 满分 |
+| **emoji 密度** | 30 | 与用户风格匹配(高/中/低 三档) |
+| **段首模式** | 20 | 用到 top 3 开头短语之一 |
+| **高频词** | 10 | top 10 词命中 ≥ 30% 满分 |
+
+#### 与 AI 中心集成(下一步)
+
+`make_chat_with_style(user_id)` helper 自动把画像注入 chat_completion 的 system prompt。
+下一步:
+- `/ai/expand` 加可选 `?user_style=true` 参数
+- `/ai/titles` / `/ai/adapt` 同上
+- 扩写完自动调 `/api/style/score` 评风格,告诉用户"这版最像你的风格"
+
+#### 端点契约
+
+| 端点 | 方法 | 鉴权 | 说明 |
+|------|------|------|------|
+| `/api/style/profile` | GET | ✅ | 取当前用户 StyleProfile |
+| `/api/style/refresh` | POST | ✅ | 重算画像(分析所有 content body) |
+| `/api/style/score` | POST | ✅ | 给 text 打 0-100 风格一致性分 |
+
+---
+
 ## 16. 配套文档
 
 | 文档 | 说明 |
