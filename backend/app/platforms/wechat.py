@@ -31,6 +31,19 @@ class WeChatUploadError(Exception):
     """公众号 API 调用失败。"""
 
 
+def _looks_like_html(s: str) -> bool:
+    """粗略检测: 输入是否是 HTML(而非 markdown)。
+
+    用于 P0-7 排版引擎: 若 input 已是 HTML, 不再套主题(避免 escape 已有标签)。
+    """
+    if not s:
+        return False
+    s = s.lstrip().lower()
+    # 典型 HTML 起始标签
+    html_starts = ("<p", "<h1", "<h2", "<h3", "<h4", "<img", "<div", "<br", "<strong", "<em")
+    return any(s.startswith(tag) for tag in html_starts)
+
+
 # access_token 缓存
 class _TokenCache:
     def __init__(self):
@@ -306,8 +319,13 @@ class WeChatAdapter(PlatformAdapter):
         *,
         poll_interval: float = 2.0,
         poll_timeout: float = 30.0,
+        theme: str = "default",
     ) -> Dict[str, Any]:
-        """一键全流程:uploadimg(×N) → 草稿 → 派发 → 轮询 → 返结果。
+        """一键全流程:Markdown 渲染 → uploadimg(×N) → 草稿 → 派发 → 轮询 → 返结果。
+
+        Args:
+            body_html: Markdown 原文(若已是 HTML 也可 — 用 detect 决定是否套主题)
+            theme: 公众号排版主题 (default/grace/simple), P0-7 集成
 
         终态返回:
           - {status: "published", article_url, freepublish_status: 0, ...}
@@ -321,6 +339,15 @@ class WeChatAdapter(PlatformAdapter):
             download_image,
             get_inline_dir,
         )
+        # P0-7: 套公众号排版主题(仅当输入是 markdown;若是 HTML 则 skip — 避免转义已有标签)
+        from app.services.wechat_formatter import render as _md_render, THEMES as _THEMES
+        if theme not in _THEMES:
+            theme = "default"
+        if _looks_like_html(body_html):
+            # 已是 HTML — 不套主题(会让 <img> 之类的标签被 escape)
+            log.debug("publish_article_full_auto: input is HTML, skip theme render")
+        else:
+            body_html = _md_render(body_html, theme=theme)
 
         result: Dict[str, Any] = {
             "status": "failed",
@@ -332,6 +359,7 @@ class WeChatAdapter(PlatformAdapter):
             "thumb_media_id": None,
             "body_html": body_html,
             "error_message": None,
+            "theme": theme,
         }
 
         # 1. 基础校验

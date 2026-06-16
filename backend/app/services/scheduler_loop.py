@@ -353,10 +353,13 @@ class SchedulerLoop:
                 return result
 
             adapter = WeChatAdapter(account)
+            # P0-7: 从 content 取主题(若用户在前端存了 wechat_theme 字段)
+            theme = content.get("wechat_theme") or "default"
             full_result = await adapter.publish_article_full_auto(
                 title=content.get("title", ""),
                 body_html=content.get("body", ""),
                 cover_image_path=cover_local,
+                theme=theme,
             )
             result = full_result
             # 对外契约统一用 "url"(跟视频流 publish_now 一致),内部 adapter 叫 article_url

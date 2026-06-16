@@ -59,9 +59,10 @@ class PublishNowRequest(BaseModel):
 
 
 class WeChatPublishNowRequest(BaseModel):
-    """P0-1: 公众号全自动图文发布(端到端)。"""
+    """P0-1: 公众号全自动图文发布(端到端)。P0-7: 加 theme 字段(默认 default)。"""
     content_id: str
     account_id: str
+    theme: str = Field("default", description="排版主题 default/grace/simple")
 
 
 # ============ 路由 ============
@@ -169,10 +170,10 @@ async def publish_now(req: PublishNowRequest):
 
 @router.post("/publish-article-now")
 async def publish_article_now(req: WeChatPublishNowRequest):
-    """P0-1: 公众号全自动图文发布(图文混排 + 端到端)。
+    """P0-1: 公众号全自动图文发布(图文混排 + 端到端) + P0-7 排版主题。
 
     走 scheduler_loop.publish_wechat_now,独立于视频 _dispatch_task。
-    阻塞轮询 30s,返 {status, url, article_url, draft_media_id, freepublish_id, ...}。
+    阻塞轮询 30s,返 {status, url, article_url, draft_media_id, freepublish_id, theme, ...}。
     """
     account = store.get_account(req.account_id)
     if not account:
@@ -185,6 +186,11 @@ async def publish_article_now(req: WeChatPublishNowRequest):
     content = store.get_content(req.content_id)
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
+    # P0-7: theme 存到 content 上(让 publish_wechat_now 透传)
+    from app.services.wechat_formatter import THEMES
+    theme = req.theme if req.theme in THEMES else "default"
+    if content.get("wechat_theme") != theme:
+        store.update_content(req.content_id, {"wechat_theme": theme})
     from app.services.scheduler_loop import scheduler_loop
     return await scheduler_loop.publish_wechat_now(
         content_id=req.content_id, account_id=req.account_id,

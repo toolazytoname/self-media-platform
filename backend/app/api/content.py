@@ -1,11 +1,12 @@
 # 内容管理 API
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from app.store import store
+from app.core.security import require_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_user)])  # A3: 所有 content 端点要求登录
 
 
 # ============ Pydantic 模型 ============
@@ -240,3 +241,40 @@ async def export_all(format: str = "json", status: Optional[str] = None, platfor
         from fastapi.responses import PlainTextResponse
         return PlainTextResponse(buf.getvalue(), media_type="text/csv")
     raise HTTPException(status_code=400, detail="format must be json/markdown/csv")
+
+
+# ============ P0-7: 公众号排版引擎 — 预览端点 ============
+from pydantic import BaseModel as _BM, Field as _F
+from app.services.wechat_formatter import render as _format, THEMES as _THEMES
+
+
+class FormatPreviewRequest(_BM):
+    body: str = _F(..., min_length=0, description="Markdown 原文")
+    theme: str = _F("default", description="default / grace / simple")
+
+
+class FormatPreviewResponse(_BM):
+    theme: str
+    theme_name: str
+    body_chars: int
+    html: str
+    html_chars: int
+
+
+@router.post("/format")
+async def format_for_wechat(req: FormatPreviewRequest):
+    """预览公众号排版效果(不保存)。
+
+    用途: 编辑器右侧"实时预览" — 切换主题看效果,再决定用哪个发公众号。
+    """
+    theme = req.theme
+    if theme not in _THEMES:
+        raise HTTPException(400, f"unknown theme: {theme}; available: {list(_THEMES.keys())}")
+    html = _format(req.body, theme=theme)
+    return FormatPreviewResponse(
+        theme=theme,
+        theme_name=_THEMES[theme]["name"],
+        body_chars=len(req.body),
+        html=html,
+        html_chars=len(html),
+    )
