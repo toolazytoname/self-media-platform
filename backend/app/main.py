@@ -14,6 +14,7 @@ from app.api import (
     auth as auth_api,
     templates as templates_api,
     sources as sources_api,
+    hot,  # P0-2: 选题雷达
 )
 from app.core.config import settings
 from app.services.scheduler_loop import scheduler_loop
@@ -32,10 +33,16 @@ async def lifespan(app: FastAPI):
     register_provider("claude", ClaudeProvider)
     register_provider("openai", OpenAIProvider)
     print(f"   AI providers: minimax / claude / openai (default: {settings.DEFAULT_AI_PROVIDER})")
-    # Phase 2: 确保视频 / cookie 目录存在
+    # Phase 2: 确保视频 / cookie / 上传 目录存在
     Path(settings.STORAGE_DIR).mkdir(parents=True, exist_ok=True)
     Path(settings.VIDEOS_DIR).mkdir(parents=True, exist_ok=True)
     Path(settings.COOKIES_DIR).mkdir(parents=True, exist_ok=True)
+    Path(settings.UPLOADS_DIR).mkdir(parents=True, exist_ok=True)
+    # Phase 6: SQLite 持久化 — 启动时建表 + 从 DB 加载回内存
+    from app.db.init_db import init_db, load_into_store
+    init_db()
+    loaded = load_into_store()
+    print(f"   💾 SQLite: tables ready, {loaded} rows loaded into memory")
     # 初始化默认模板
     templates_api.init_default_templates()
     # 启动后台调度循环
@@ -74,6 +81,10 @@ app.include_router(settings_api.router, prefix="/api/config", tags=["设置"])
 app.include_router(auth_api.router, prefix="/api/auth", tags=["认证"])
 app.include_router(templates_api.router, prefix="/api/templates", tags=["模板"])
 app.include_router(sources_api.router, prefix="/api/sources", tags=["来源管理"])
+
+
+# P0-2: 选题雷达 / 热榜聚合
+app.include_router(hot.router, prefix="/api/hot", tags=["热榜雷达"])
 
 
 @app.get("/")

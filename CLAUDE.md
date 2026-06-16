@@ -5,6 +5,29 @@
 A self-media content platform (Python backend + Vite/TypeScript frontend).
 See `README.md` for product scope and `PLAN.md` for handover context.
 
+## 会话重启指引 (READ THIS FIRST)
+
+> 每次会话开始时,先读这两个文件再开工:
+>
+> 1. **`docs/TASKS.md`** — 当前活跃任务 + 完成历史 + 恢复点
+> 2. **`docs/CHANGELOG.md`** — 最近完成的功能/改动 (commit SHA + 验证结果)
+>
+> **不要重新看完整 codebase**。TASKS.md 已经写明"下个会话从这里继续"。
+>
+> 接到"继续未完成任务"指令时,直接:
+> ```bash
+> cat docs/TASKS.md | head -60
+> ```
+> 然后认领第一个 `in_progress` 或 `pending` 任务,从"下个会话从这里继续"读起。
+>
+> **工作约定**:
+> - 关键里程碑(开写代码 / 跑通测试 / commit)必写 `docs/TASKS.md` progress section
+> - TDD 走通:RED 测试 agent → 我实现 GREEN → code-reviewer agent
+> - 验证用子 agent (e2e-runner / tdd-guide / code-reviewer),不烧主对话 context
+> - 完成后即时 commit + 更新 CHANGELOG,不留悬空状态
+
+---
+
 ## The dev environment: atelier-smp
 
 This project runs inside an **OrbStack Linux VM called `atelier-smp`**,

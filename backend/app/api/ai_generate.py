@@ -828,3 +828,82 @@ async def delete_creation(creation_id: str) -> Dict[str, Any]:
     if not store.delete_creation(creation_id):
         raise HTTPException(status_code=404, detail="AI creation not found")
     return {"ok": True, "id": creation_id}
+
+# ============ P0-2: 选题雷达 — AI 单独端点 ============
+
+class HotRewriteRequest(BaseModel):
+    hot_title: str = Field(..., min_length=1, max_length=200)
+    platform: str = Field(..., description="weibo|zhihu|douyin|xiaohongshu")
+    n: int = Field(3, ge=1, le=10)
+    tone: str = Field("casual", description="casual|professional|clickbait")
+    provider: Optional[str] = None
+    model: Optional[str] = None
+
+
+class HotAngleItem(BaseModel):
+    text: str
+    hook: str
+    target_platform: str
+
+
+class HotRewriteResponse(BaseModel):
+    angles: List[HotAngleItem]
+    platform: str
+    total: int
+
+
+@router.post("/hot-rewrite", response_model=HotRewriteResponse)
+async def hot_rewrite(req: HotRewriteRequest):
+    """把一个热榜话题改写为 N 个自媒体角度(含 hook 和目标平台)。"""
+    import json
+    import re
+    system = (
+        f"你是自媒体选题专家。用户给你一个来自 {req.platform} 的热搜话题。"
+        f"请生成 {req.n} 个适合做自媒体内容的角度,语气:{req.tone}。"
+        "每条包含:text(角度标题)/hook(开头钩子)/target_platform(适合哪个平台)。"
+        "请用 JSON 数组格式输出。"
+    )
+    user_msg = (
+        f"热搜话题:{req.hot_title}\n"
+        f"请输出 {req.n} 个角度。严格 JSON 数组,每条字段:text,hook,target_platform。"
+    )
+    raw = await _timed_chat(
+        creation_type="hot_angle",
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
+        prompt_summary=f"hot_rewrite:{req.hot_title[:50]}",
+        provider=req.provider,
+        model=req.model,
+        max_tokens=1024,
+    )
+    # 尝试解析 JSON 数组;失败就按行切分
+    angles: List[Dict[str, str]] = []
+    m = re.search(r"\[.*\]", raw, re.DOTALL)
+    if m:
+        try:
+            parsed = json.loads(m.group(0))
+            if isinstance(parsed, list):
+                for it in parsed[:req.n]:
+                    if isinstance(it, dict):
+                        angles.append({
+                            "text": str(it.get("text", "")).strip(),
+                            "hook": str(it.get("hook", "")).strip(),
+                            "target_platform": str(it.get("target_platform", req.platform)).strip(),
+                        })
+        except Exception:
+            pass
+    if not angles:
+        # fallback: 按行切,去掉编号/引号
+        for line in raw.splitlines():
+            t = line.strip().lstrip("0123456789. 、-").strip().strip("\"'「」『』")
+            if t and 2 <= len(t) <= 200:
+                angles.append({"text": t, "hook": "", "target_platform": req.platform})
+                if len(angles) >= req.n:
+                    break
+    if not angles:
+        # 兜底
+        angles = [{"text": raw.strip()[:200], "hook": "", "target_platform": req.platform}]
+    return HotRewriteResponse(
+        angles=[HotAngleItem(**a) for a in angles],
+        platform=req.platform,
+        total=len(angles),
+    )
