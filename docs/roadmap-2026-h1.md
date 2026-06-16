@@ -182,6 +182,25 @@ P0-1 已完成实施(commit 待提交):
 
 参考: `/Users/lazy/.agents/skills/baoyu-post-to-wechat/`(Chrome CDP 路径,代码不可复用,仅设计思路借鉴)
 
+## 2026-06-16 更新
+
+**P0-2 选题雷达已完成** (commit `977fcaf`):
+- ✅ `hot_list_client.py` (HotListClient 类,vvhan.com 聚合 + 网络 fail 兜底 mock)
+- ✅ `hot.py` router (list / refresh / rewrite / create-content)
+- ✅ `ai_generate.py` 加 `/ai/hot-rewrite` 端点
+- ✅ `store.py` 加 hot_topics + 5 CRUD
+- ✅ 33/33 hot 测试通过
+- ⏳ 前端 UI (Sources 热榜 tab) — P1 补齐
+
+**P0-3 一稿多发已完成** (commit `a4eaf45`):
+- ✅ `ai_generate.py` 加 PLATFORM_TIPS 4 平台模板
+- ✅ `/api/ai/adapt` 并发改写 (asyncio.gather)
+- ✅ `/api/ai/adapt/save` 落库为草稿
+- ✅ 16/16 adapt 测试通过
+- ⏳ 前端 UI (AI 中心"一稿多发" tab) — P1 补齐
+
+**累计: 99/99 测试通过,3 个 P0 全部完成。**
+
 ---
 
 ## 参考
