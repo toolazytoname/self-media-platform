@@ -786,6 +786,94 @@ curl -s -X POST http://127.0.0.1:8000/api/style/score \
 
 ---
 
+### 15.6 数据回流闭环 (P1-2)
+
+> **干什么**:发布后录入阅读/点赞/评论数 → 趋势 top + 最佳发布时段统计。
+> **状态**:**后端 API ✅**(14/14 测试通过)。自动抓取留 TODO(各平台反爬限制大)。
+
+#### 工作流
+
+```
+1. 用户在发布记录页手动录入阅读/点赞/评论数
+   POST /api/metrics/record {content_id, views, likes, comments, shares}
+   ↓
+2. AI 中心 + 发布记录面板拉趋势
+   GET /api/metrics/trending?top_n=10&platform=wechat
+   → 哪些选题表现最好
+   ↓
+3. AI 中心推荐"最佳发布时段"
+   GET /api/metrics/best-time?platform=wechat
+   → 14:00 平均 150 views;9:00 平均 50 views
+   ↓
+4. (未来) AI 中心扩写选题时,优先推"历史高表现时段 + 主题相似"
+```
+
+#### 手动 API 流程
+
+```bash
+# 1. 录入一条数据(同 content_id 后写覆盖)
+curl -s -X POST http://127.0.0.1:8000/api/metrics/record \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content_id": "content_abc",
+    "views": 1500, "likes": 120, "comments": 30, "shares": 15,
+    "platform": "wechat"
+  }' | python3 -m json.tool
+
+# 2. 取某 content 指标
+curl -s http://127.0.0.1:8000/api/metrics/content/content_abc \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# 3. 趋势 top 10
+curl -s "http://127.0.0.1:8000/api/metrics/trending?top_n=10&platform=wechat" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# → {
+#     "items": [
+#       {"content_id": "...", "views": 5000, "likes": 320, "engagement_score": 8820, ...},
+#       ...
+#     ],
+#     "count": 10
+#   }
+
+# 4. 最佳发布时段
+curl -s "http://127.0.0.1:8000/api/metrics/best-time?platform=wechat" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# → {
+#     "best_hour": 14,
+#     "best_avg_views": 150,
+#     "sample_size": 8,
+#     "avg_views_by_hour": {0: 50, 1: 30, ..., 14: 150, ...}
+#   }
+```
+
+#### 综合得分算法
+
+```
+engagement_score = views + likes × 5 + comments × 10
+```
+
+(权重 5/10 是经验值 — 点赞 / 评论 的运营价值 >> 浏览)
+
+#### 端点契约
+
+| 端点 | 方法 | 鉴权 | 说明 |
+|------|------|------|------|
+| `/api/metrics/record` | POST | ✅ | 录入一条(同 id 覆盖) |
+| `/api/metrics/content/{id}` | GET | ✅ | 取一条;404 if 不存在 |
+| `/api/metrics/trending` | GET | ✅ | top N(支持 platform 过滤) |
+| `/api/metrics/best-time` | GET | ✅ | 按小时聚合, 返 best_hour + 全表 |
+
+#### 未来扩展
+
+- **自动抓取**:scheduler 加 hourly task 调公开 API(知乎热榜/微博热搜)
+- **AI 中心集成**:扩写选题时,自动推"历史高表现时段 + 主题相似"组合
+- **数据看板**:前端在 /stats 页加趋势图(柱状图/时段热力图)
+
+---
+
 ## 16. 配套文档
 
 | 文档 | 说明 |

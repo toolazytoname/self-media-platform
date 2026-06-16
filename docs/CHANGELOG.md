@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-06-16 — P1-2 数据回流闭环 (MVP)
+
+- **Commit**: `feat(metrics): 数据回流闭环 (P1-2 MVP)`
+- **范围**: 6 文件 / +431 行
+- **测试**: 14/14 通过
+- **关键模块**:
+  - `backend/app/services/metrics_service.py` (新) — 4 函数:record / get / trending / best_time
+  - `backend/app/api/metrics.py` (新) — 4 端点
+  - `backend/app/store.py` — `publish_metrics` per-content dict
+  - `backend/tests/conftest.py` — fresh_store 清 publish_metrics
+  - `backend/app/main.py` — 注册 /api/metrics 路由
+- **设计**:
+  - 录入覆盖式(同 content_id 后写覆盖前)
+  - 趋势综合得分 = views + likes×5 + comments×10
+  - best_time = 0-23 各小时平均 views
+  - 自动抓取(知乎/微博公开 API)留 TODO
+- **未做**: 自动抓取 + 前端 UI 趋势图 — P1.5/P2 补齐
+- **累计测试**: 183/183 ✅
+
+---
+
 ## 2026-06-16 — P1-1 去 AI 味 / 文风克隆
 
 - **Commit**: `feat(style): 去 AI 味 / 文风克隆 (P1-1)`
